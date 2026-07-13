@@ -1,6 +1,11 @@
 import { SalesPriority } from "../score/sales-priority.enum";
-export class Business {
+import { BusinessStatus } from "./business-status.enum";
 
+export class Business {
+  id!:string;
+
+  status!:BusinessStatus;
+   
   name!: string;
 
   instagramUrl?: string;
@@ -13,7 +18,6 @@ export class Business {
 
   salesPriority?: SalesPriority;
 
-}
+  createdAt!:Date;
 
-//salesPriority değerini hesapla 
-//actual Object
+}

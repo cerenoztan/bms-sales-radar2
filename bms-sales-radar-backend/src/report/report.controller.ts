@@ -3,6 +3,8 @@ import {
   Get,
   StreamableFile,
 } from '@nestjs/common';
+import { BusinessStatus } from '../business/business-status.enum';
+import { SalesPriority } from '../score/sales-priority.enum';
 import { Business } from '../business/business.entity';
 import { ExcelReportService } from './excel-report.service';
 
@@ -15,20 +17,27 @@ export class ReportController {
   @Get('businesses/excel')
   async downloadBusinessReport(): Promise<StreamableFile> {
     const businesses: Business[] = [
+        {
+        id: '1',
+        status: BusinessStatus.NEW,
+        name: 'BMS Cafe',
+        instagramUrl: 'https://instagram.com/bmscafe',
+        address: 'Kadıköy / İstanbul',
+        phone: '+905551112233',
+        score: 92,
+        salesPriority: SalesPriority.LOW,
+        createdAt: new Date(),
+      },
       {
+        id: '2',
+        status: BusinessStatus.VERIFIED,
         name: 'Coffee House',
-        address: 'Kadıköy, İstanbul',
-        phone: '0555 111 22 33',
         instagramUrl: 'https://instagram.com/coffeehouse',
-      },
-      {
-        name: 'Green Market',
-        address: 'Beşiktaş, İstanbul',
-      },
-      {
-        name: 'New Restaurant',
-        address: 'Şişli, İstanbul',
-        phone: '0555 444 55 66',
+        address: 'Beşiktaş / İstanbul',
+        phone: '+905327654321',
+        score: 76,
+        salesPriority: SalesPriority.HIGH,
+        createdAt: new Date(),
       },
     ];
 
