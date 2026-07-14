@@ -6,6 +6,7 @@ import { Business } from './business.entity';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { ScoreService } from '../score/score.calculator';
+import { DuplicateCheckerService } from './duplicate-checker.service';
 
 @Injectable()
 export class BusinessService {
@@ -13,6 +14,7 @@ export class BusinessService {
     @InjectRepository(Business)
     private readonly businessRepository: Repository<Business>,
     private readonly scoreService:ScoreService,
+    private readonly duplicateChecker:DuplicateCheckerService,
   ) {}
 
   //büyükten küçüğe sıralamak için
@@ -25,12 +27,30 @@ export class BusinessService {
   }
   //after controller create will do a lot of work
   async create(createBusinessDto:CreateBusinessDto,): Promise<Business>{
+
+     const phone=this.duplicateChecker.normalizePhone(createBusinessDto.phone,);
+     const instagramUrl=this.duplicateChecker.normalizeInstagram(createBusinessDto.instagramUrl,);
+
+     const duplicate=await this.duplicateChecker.findDuplicate(phone,instagramUrl,createBusinessDto.name,createBusinessDto.address,);
+
+     if(duplicate){
+      this.businessRepository.merge(duplicate,{...createBusinessDto,
+        // use phone if exists otherwise merge the new phone
+        phone:phone ?? duplicate.phone,
+        instagramUrl:instagramUrl??duplicate.instagramUrl,
+      });
+
+      const scoredBusiness=this.scoreService.createScoredBusiness(duplicate);
+      return this.businessRepository.save(scoredBusiness);
+     }
+
     //creating a Business object from DTO
-    const business= this.businessRepository.create(createBusinessDto);
+    const business= this.businessRepository.create({...createBusinessDto,phone,instagramUrl});
 
     const scoredBusiness=this.scoreService.createScoredBusiness(business);
     //saving the object to the database
     return this.businessRepository.save(scoredBusiness);
+
   }
   async findOne(id:number):Promise<Business>{
     const business=await this.businessRepository.findOneBy({id,});
