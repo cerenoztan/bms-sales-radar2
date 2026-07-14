@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Business } from './business/business.entity';
 import { BusinessModule } from './business/business.module';
 import { ReportModule } from './report/report.module';
 import { ScoreModule } from './score/score.module';
@@ -6,7 +8,18 @@ import { ScoreModule } from './score/score.module';
 
 
 @Module({
-  imports: [BusinessModule,ReportModule,ScoreModule], // uses ScoreModule already
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'better-sqlite3',
+      database: 'sales-radar.sqlite',
+      entities: [Business],
+      synchronize: true,
+    }),
+
+    BusinessModule,
+    ScoreModule,
+    ReportModule,
+  ],
 })
 export class AppModule {}
 

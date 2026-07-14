@@ -29,3 +29,5 @@ export class UpdateBusinessDto {
   @IsEnum(BusinessStatus)
   status?: BusinessStatus;
 }
+
+//all optional

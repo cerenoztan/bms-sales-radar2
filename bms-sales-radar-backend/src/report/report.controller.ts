@@ -18,7 +18,7 @@ export class ReportController {
   async downloadBusinessReport(): Promise<StreamableFile> {
     const businesses: Business[] = [
         {
-        id: '1',
+        id: 1,
         status: BusinessStatus.NEW,
         name: 'BMS Cafe',
         instagramUrl: 'https://instagram.com/bmscafe',
@@ -29,7 +29,7 @@ export class ReportController {
         createdAt: new Date(),
       },
       {
-        id: '2',
+        id: 2,
         status: BusinessStatus.VERIFIED,
         name: 'Coffee House',
         instagramUrl: 'https://instagram.com/coffeehouse',
