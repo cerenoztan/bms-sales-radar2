@@ -5,7 +5,7 @@ import { BusinessModule } from './business/business.module';
 import { ReportModule } from './report/report.module';
 import { ScoreModule } from './score/score.module';
 import { ScheduleModule } from '@nestjs/schedule';
-
+import { Source } from './source/source.entity';
 
 @Module({
   imports: [
@@ -14,7 +14,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
-      entities: [Business],
+      entities: [Business,Source],
       synchronize: true,
     }),
 

@@ -2,9 +2,11 @@ import{
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+import { Source } from '../source/source.entity';
 import { SalesPriority } from "../score/sales-priority.enum";
 import { BusinessStatus } from "./business-status.enum";
 
@@ -44,6 +46,9 @@ export class Business {
       default:SalesPriority.LOW,
   })
   salesPriority?: SalesPriority;
+
+  @OneToMany(()=> Source,(source)=>source.business)
+  sources!:Source[];
 
   @CreateDateColumn()
   createdAt!:Date;
