@@ -51,3 +51,5 @@ export class BusinessController {
 //HTTP istek-HTTP yanıt 
 //API :Application Programming Interface :uygulamanın dışarıya açtığı fonksiyonlardır.
 //API endpoints 
+
+//CRUD C:CREATE R:READ U:UPDATE D:DELETE
