@@ -6,6 +6,7 @@ import { ReportModule } from './report/report.module';
 import { ScoreModule } from './score/score.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { Source } from './source/source.entity';
+import { SourceModule } from './source/source.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Source } from './source/source.entity';
     BusinessModule,
     ScoreModule,
     ReportModule,
+    SourceModule,
   ],
 })
 export class AppModule {}

@@ -81,3 +81,6 @@ export class SourceService{
 //Repository → performs database operations on that table.
 //Service → contains the business logic and coordinates one or more repositories.
 //Controller → receives HTTP requests and calls the service.
+
+
+//source url'leri instagram ve adres kısmında görünecek mi ??? görünsün 

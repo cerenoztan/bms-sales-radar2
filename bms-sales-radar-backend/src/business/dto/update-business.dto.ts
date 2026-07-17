@@ -18,7 +18,6 @@ export class UpdateBusinessDto {
   address?: string;
 
   @IsOptional()
-  @IsUrl()
   instagramUrl?: string;
 
   @IsOptional()
