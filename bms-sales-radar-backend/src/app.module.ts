@@ -7,6 +7,7 @@ import { ScoreModule } from './score/score.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { Source } from './source/source.entity';
 import { SourceModule } from './source/source.module';
+import { CrawlerModule } from './crawler/crawler.module';
 
 @Module({
   imports: [
@@ -23,6 +24,8 @@ import { SourceModule } from './source/source.module';
     ScoreModule,
     ReportModule,
     SourceModule,
+    CrawlerModule,
+
   ],
 })
 export class AppModule {}

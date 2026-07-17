@@ -23,6 +23,18 @@ export class SourceService{
         name:string,
         url:string,
     ):Promise<Source>{
+        const existingSource=await this.sourceRepository.findOne({
+            where:{
+                url,
+            },
+            relations:{
+                business:true,
+            },
+        });
+        if(existingSource){
+            return existingSource;
+        }
+
         //the actual Business object from the database
         //TypeORM takes the ID and stores into businessID
         const business= await this.businessRepository.findOneBy({id:businessID,});
