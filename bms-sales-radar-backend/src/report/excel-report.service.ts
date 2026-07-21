@@ -3,7 +3,6 @@ import * as ExcelJS from 'exceljs';
 import { Business } from '../business/business.entity';
 import { ScoreService } from '../score/score.calculator';
 
-
 @Injectable()
 export class ExcelReportService {
   constructor(private readonly scoreService: ScoreService) {}
@@ -37,45 +36,25 @@ export class ExcelReportService {
         width: 30,
       },
       {
-        header:'Google Maps',
-        key:'googleMapsUrl',
-        width:25,
-      },
-      {
         header: 'Sales Priority',
         key: 'salesPriority',
         width: 20,
       },
     ];
-    businesses.forEach((business)=>{
-      const scoredBusiness=this.scoreService.createScoredBusiness(business);
-      const googleMapsSource=business.sources?.find((source)=> source.name=='GOOGLE_PLACES',);
 
-      const row = worksheet.addRow({
+    const scoredBusinesses = businesses.map((business) =>
+      this.scoreService.createScoredBusiness(business),
+    );
+
+    scoredBusinesses.forEach((business) => {
+      worksheet.addRow({
         name: business.name,
         address: business.address,
         phone: business.phone ?? '',
         instagramUrl: business.instagramUrl ?? '',
-        googleMapsUrl: '',
-        salesPriority: scoredBusiness.salesPriority,
+        salesPriority: business.salesPriority,
       });
-      if (googleMapsSource?.url) {
-        const googleMapsCell = row.getCell('googleMapsUrl');
-
-        googleMapsCell.value = {
-          text: 'Open in Google Maps',
-          hyperlink: googleMapsSource.url,
-        };
-        googleMapsCell.font = {
-          color: {
-            argb: 'FF0000FF',
-          },
-          underline: true,
-        };
-      }
-
     });
-
 
     const buffer = await workbook.xlsx.writeBuffer();
 

@@ -20,9 +20,6 @@ export class BusinessService {
   //büyükten küçüğe sıralamak için
   async findAllSortedByScore(): Promise<Business[]> {
     return this.businessRepository.find({
-      relations:{
-        sources:true,
-      },
       order: {
         score: 'DESC',
       },

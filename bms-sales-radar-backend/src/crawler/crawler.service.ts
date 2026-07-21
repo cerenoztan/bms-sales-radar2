@@ -1,55 +1,88 @@
-import { Injectable ,NotFoundException} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
+import { Business } from '../business/business.entity';
 import { BusinessService } from '../business/business.service';
 import { SourceService } from '../source/source.service';
-import { BusinessCrawler } from './business-crawler.interface';
-import { BusinessType } from './crawler-business-type.enum';
-import { CrawledBusiness } from './crawled-business.type';
-import { CrawlerRegistry } from './crawler.registry';
+
+import { FilgeziAdapter } from './adapters/filgezi.adapter';
+
+export interface CrawlResult {
+  discovered: number;
+  processed: number;
+  failed: number;
+  businesses: Business[];
+  errors: Array<{
+    name: string;
+    message: string;
+  }>;
+}
 
 @Injectable()
 export class CrawlerService {
+  private readonly logger = new Logger(CrawlerService.name);
+
   constructor(
+    private readonly filgeziAdapter: FilgeziAdapter,
     private readonly businessService: BusinessService,
     private readonly sourceService: SourceService,
-    private readonly crawlerRegistry:CrawlerRegistry,
   ) {}
 
-  async runByType(type: BusinessType): Promise<void> {
-     const crawler = this.crawlerRegistry.get(type);
+  async crawlFilgezi(): Promise<CrawlResult> {
+    const crawledBusinesses =
+      await this.filgeziAdapter.crawl();
 
-    if (!crawler) {
-      throw new NotFoundException(
-        `${type} için crawler bulunamadı.`,
-      );
+    const savedBusinesses: Business[] = [];
+
+    const errors: Array<{
+      name: string;
+      message: string;
+    }> = [];
+
+    for (const crawledBusiness of crawledBusinesses) {
+      try {
+        const business = await this.businessService.create({
+          name: crawledBusiness.name,
+          address: crawledBusiness.address,
+          phone: crawledBusiness.phone,
+          instagramUrl: crawledBusiness.instagramUrl,
+        });
+
+        await this.sourceService.create(
+          business.id,
+          crawledBusiness.sourceName,
+          crawledBusiness.sourceUrl,
+          crawledBusiness.externalId,
+        );
+
+        savedBusinesses.push(business);
+
+        this.logger.log(
+          `Business processed: ${business.name}`,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : String(error);
+
+        errors.push({
+          name: crawledBusiness.name,
+          message,
+        });
+
+        this.logger.error(
+          `Business could not be processed: ${crawledBusiness.name}`,
+          message,
+        );
+      }
     }
 
-    const businesses = await crawler.crawl();
-
-    for (const business of businesses) {
-      await this.processBusiness(crawler, business);
-    }
+    return {
+      discovered: crawledBusinesses.length,
+      processed: savedBusinesses.length,
+      failed: errors.length,
+      businesses: savedBusinesses,
+      errors,
+    };
   }
-
-
- private async processBusiness(
-  crawler: BusinessCrawler,
-  crawledBusiness: CrawledBusiness,
-): Promise<void> {
-   const business = await this.businessService.create({
-    name: crawledBusiness.name,
-    address: crawledBusiness.address,
-    phone: crawledBusiness.phone,
-    instagramUrl: crawledBusiness.instagramUrl,
-    websiteUrl: crawledBusiness.websiteUrl,
-    type: crawler.businessType,
-  });
-
-  await this.sourceService.create(
-  business.id,
-  crawledBusiness.sourceName,
-  crawledBusiness.sourceUrl,
-  crawledBusiness.externalId,
-  );
- }
 }
