@@ -22,8 +22,17 @@ export class SourceService{
         businessID:number,
         name:string,
         url:string,
+        externalId?:string,
     ):Promise<Source>{
-        const existingSource=await this.sourceRepository.findOne({
+        const existingSource=externalId ? await this.sourceRepository.findOne({
+
+            where:{
+                externalId,
+            },
+            relations:{
+                business:true,
+            },})
+            :await this.sourceRepository.findOne({
             where:{
                 url,
             },
@@ -47,6 +56,7 @@ export class SourceService{
             name,
             url,
             business,
+            externalId,
         });
         return this.sourceRepository.save(source);
     }

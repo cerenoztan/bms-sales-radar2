@@ -9,6 +9,8 @@ import{
 import { Source } from '../source/source.entity';
 import { SalesPriority } from "../score/sales-priority.enum";
 import { BusinessStatus } from "./business-status.enum";
+import { BusinessType } from '../crawler/crawler-business-type.enum';
+import { IsOptional } from 'class-validator';
 
 @Entity('businesses')
 export class Business {
@@ -23,14 +25,20 @@ export class Business {
   })
   status!:BusinessStatus;
 
+  @Column({
+  type: 'text',
+  default: BusinessType.OTHER,
+  })
+  type!: BusinessType;
+  
   @Column()
   name!: string;
 
   @Column({nullable:true})
   instagramUrl?: string;
 
-  @Column()
-  address!: string;
+  @Column({nullable:true})
+  address?: string;
 
   @Column({nullable:true})//can be null
   phone?: string;
@@ -52,6 +60,19 @@ export class Business {
 
   @CreateDateColumn()
   createdAt!:Date;
+
+  @Column({ nullable: true })
+  websiteUrl?: string;
+
+  @Column({
+    type: 'timestamp',
+    nullable: true,
+  })
+  openingDate?: Date;
+
+  @Column({ nullable: true })
+  discoveredArea?: string;
+
 
 }
 

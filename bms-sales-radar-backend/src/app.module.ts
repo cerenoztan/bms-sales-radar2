@@ -8,10 +8,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { Source } from './source/source.entity';
 import { SourceModule } from './source/source.module';
 import { CrawlerModule } from './crawler/crawler.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ConfigModule.forRoot({isGlobal:true,}),
 
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',

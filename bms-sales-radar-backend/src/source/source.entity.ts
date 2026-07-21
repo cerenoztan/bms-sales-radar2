@@ -18,9 +18,12 @@ export class Source{
 
     @Column()
     name!:string;
+    @Column({ nullable: true })
+    externalId?:string;
  
     @Column()
     url!:string;
+
 
     // the relationship will be with Business entity
     //at Business entity sources represent the relationship

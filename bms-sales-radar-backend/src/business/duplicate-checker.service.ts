@@ -56,6 +56,7 @@ export class DuplicateCheckerService{
   ):Promise<Business | null >{
         const normalizedPhone=this.normalizePhone(phone);
         const normalizedInstagram=this.normalizeInstagram(instagramUrl);
+        
         if(normalizedPhone){
             const business=await this.businessRepository.findOneBy({phone:normalizedPhone});
         
@@ -75,7 +76,7 @@ export class DuplicateCheckerService{
             const duplicate=businesses.find(
                 (business)=> business.name.toLocaleLowerCase('tr-TR').trim()==
                 name.toLocaleLowerCase('tr-TR').trim() &&
-                business.address.toLocaleLowerCase('tr-TR').trim()==
+                this.normalizeText(business.address).toLocaleLowerCase('tr-TR').trim()==
                 address.toLocaleLowerCase('tr-TR').trim(),
             );
 

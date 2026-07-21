@@ -1,60 +1,55 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable ,NotFoundException} from '@nestjs/common';
 
 import { BusinessService } from '../business/business.service';
 import { SourceService } from '../source/source.service';
-import { Business } from '../business/business.entity';
-import { Source } from '../source/source.entity';
+import { BusinessCrawler } from './business-crawler.interface';
+import { BusinessType } from './crawler-business-type.enum';
+import { CrawledBusiness } from './crawled-business.type';
+import { CrawlerRegistry } from './crawler.registry';
 
 @Injectable()
-export class CrawlerService{
-      constructor(
+export class CrawlerService {
+  constructor(
     private readonly businessService: BusinessService,
-    private readonly sourceService: SourceService,) {}
+    private readonly sourceService: SourceService,
+    private readonly crawlerRegistry:CrawlerRegistry,
+  ) {}
 
-    async runTestCrawler() {
-    const businesses = [
-      {
-        name: 'Crawler Test Cafe',
-        address: 'Kadıköy, İstanbul',
-        phone: '+905551234567',
-        instagramUrl:
-          'https://instagram.com/crawler_test_cafe',
-        sourceName: 'Test Crawler',
-        sourceUrl:
-          'https://example.com/crawler-test-cafe',
-      },
-      {
-        name: 'Crawler Test Market',
-        address: 'Üsküdar, İstanbul',
-        phone: '+905559876543',
-        instagramUrl:
-          'https://instagram.com/crawler_test_market',
-        sourceName: 'Test Crawler',
-        sourceUrl:
-          'https://example.com/crawler-test-market',
-      },
-    ];
-    //
-    const results: Array<{
-        business:Business;
-        source:Source;}>=[];
+  async runByType(type: BusinessType): Promise<void> {
+     const crawler = this.crawlerRegistry.get(type);
 
-    for (const item of businesses) {
-      const business = await this.businessService.create({
-        name: item.name,
-        address: item.address,
-        phone: item.phone,
-        instagramUrl: item.instagramUrl,
-    });
-      const source=await this.sourceService.create(
-        business.id,
-        item.sourceName,
-        item.sourceUrl,);
-      results.push({business,source,});
+    if (!crawler) {
+      throw new NotFoundException(
+        `${type} için crawler bulunamadı.`,
+      );
     }
 
-    return results;
-  }
-   
+    const businesses = await crawler.crawl();
 
+    for (const business of businesses) {
+      await this.processBusiness(crawler, business);
+    }
+  }
+
+
+ private async processBusiness(
+  crawler: BusinessCrawler,
+  crawledBusiness: CrawledBusiness,
+): Promise<void> {
+   const business = await this.businessService.create({
+    name: crawledBusiness.name,
+    address: crawledBusiness.address,
+    phone: crawledBusiness.phone,
+    instagramUrl: crawledBusiness.instagramUrl,
+    websiteUrl: crawledBusiness.websiteUrl,
+    type: crawler.businessType,
+  });
+
+  await this.sourceService.create(
+  business.id,
+  crawledBusiness.sourceName,
+  crawledBusiness.sourceUrl,
+  crawledBusiness.externalId,
+  );
+ }
 }
