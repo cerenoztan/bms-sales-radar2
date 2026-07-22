@@ -1,10 +1,13 @@
 import * as React from 'react';
 
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
+import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
@@ -20,49 +23,135 @@ import type {
   GridRowId,
 } from '@mui/x-data-grid';
 
+const API_URL = 'http://localhost:3000';
+
 interface BusinessRow {
   id: number;
   name: string;
-  city: string;
-  phone: string;
-  source: string;
-  score: number;
-  status: 'Yüksek' | 'Orta' | 'Düşük';
+  address: string;
+  phone?: string | null;
+  instagramUrl?: string | null;
+  score?: number;
+  salesPriority?: string;
+  status: string;
+  createdAt: string;
 }
 
-const initialRows: BusinessRow[] = [
-  {
-    id: 1,
-    name: 'Örnek Yapı Market',
-    city: 'İstanbul',
-    phone: '0532 111 22 33',
-    source: 'FilGezi',
-    score: 87,
-    status: 'Yüksek',
-  },
-  {
-    id: 2,
-    name: 'Mavi Dekorasyon',
-    city: 'Ankara',
-    phone: '0544 222 33 44',
-    source: 'FilGezi',
-    score: 64,
-    status: 'Orta',
-  },
-  {
-    id: 3,
-    name: 'Güven İnşaat',
-    city: 'İzmir',
-    phone: '0555 333 44 55',
-    source: 'Manuel',
-    score: 38,
-    status: 'Düşük',
-  },
-];
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error';
+}
+
+function getPriorityColor(
+  priority?: string,
+): 'error' | 'warning' | 'success' | 'default' {
+  switch (priority) {
+    case 'HIGH':
+      return 'error';
+
+    case 'MEDIUM':
+      return 'warning';
+
+    case 'LOW':
+      return 'success';
+
+    default:
+      return 'default';
+  }
+}
+
+function getPriorityLabel(priority?: string): string {
+  switch (priority) {
+    case 'HIGH':
+      return 'Yüksek';
+
+    case 'MEDIUM':
+      return 'Orta';
+
+    case 'LOW':
+      return 'Düşük';
+
+    default:
+      return priority ?? '-';
+  }
+}
+
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'NEW':
+      return 'Yeni';
+
+    case 'VERIFIED':
+      return 'Doğrulandı';
+
+    case 'DUPLICATE':
+      return 'Tekrar';
+
+    case 'CONTACTED':
+      return 'İletişime Geçildi';
+
+    case 'VISIT_PLANNED':
+      return 'Ziyaret Planlandı';
+
+    case 'OFFER_CREATED':
+      return 'Teklif Oluşturuldu';
+
+    case 'WON':
+      return 'Kazanıldı';
+
+    case 'LOST':
+      return 'Kaybedildi';
+
+    default:
+      return status;
+  }
+}
 
 export default function BusinessGrid() {
-  const [rows, setRows] =
-    React.useState<BusinessRow[]>(initialRows);
+  const [rows, setRows] = React.useState<BusinessRow[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const [snackbar, setSnackbar] = React.useState<SnackbarState>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const loadBusinesses = React.useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_URL}/businesses`);
+
+      if (!response.ok) {
+        throw new Error(
+          `İşletmeler alınamadı. HTTP ${response.status}`,
+        );
+      }
+
+      const data: BusinessRow[] = await response.json();
+
+      setRows(data);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'İşletmeler yüklenirken bir hata oluştu.';
+
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadBusinesses();
+  }, [loadBusinesses]);
 
   const handleCreate = () => {
     alert('Yeni işletme formu sonraki adımda eklenecek.');
@@ -72,7 +161,7 @@ export default function BusinessGrid() {
     alert(`${id} numaralı işletme düzenlenecek.`);
   };
 
-  const handleDelete = (id: GridRowId) => {
+  const handleDelete = async (id: GridRowId) => {
     const shouldDelete = window.confirm(
       'Bu işletmeyi silmek istediğinize emin misiniz?',
     );
@@ -81,63 +170,119 @@ export default function BusinessGrid() {
       return;
     }
 
-    setRows((currentRows) =>
-      currentRows.filter((row) => row.id !== id),
-    );
+    try {
+      const response = await fetch(
+        `${API_URL}/businesses/${id}`,
+        {
+          method: 'DELETE',
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `İşletme silinemedi. HTTP ${response.status}`,
+        );
+      }
+
+      setRows((currentRows) =>
+        currentRows.filter((row) => row.id !== Number(id)),
+      );
+
+      setSnackbar({
+        open: true,
+        message: 'İşletme başarıyla silindi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'İşletme silinirken bir hata oluştu.';
+
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'error',
+      });
+    }
   };
 
   const columns: GridColDef<BusinessRow>[] = [
     {
       field: 'name',
       headerName: 'İşletme',
-      flex: 1.5,
-      minWidth: 200,
+      flex: 1.3,
+      minWidth: 180,
     },
     {
-      field: 'city',
-      headerName: 'Şehir',
-      flex: 1,
-      minWidth: 120,
+      field: 'address',
+      headerName: 'Adres',
+      flex: 1.8,
+      minWidth: 240,
     },
     {
       field: 'phone',
       headerName: 'Telefon',
       flex: 1,
-      minWidth: 150,
+      minWidth: 140,
+      valueFormatter: (value) => value ?? '-',
     },
     {
-      field: 'source',
-      headerName: 'Kaynak',
-      flex: 1,
-      minWidth: 120,
+      field: 'instagramUrl',
+      headerName: 'Instagram',
+      flex: 1.2,
+      minWidth: 180,
+      sortable: false,
+      renderCell: (params) => {
+        if (!params.value) {
+          return '-';
+        }
+
+        return (
+          <Link
+            href={params.value}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Profili aç
+          </Link>
+        );
+      },
     },
     {
       field: 'score',
       headerName: 'Skor',
       width: 90,
       type: 'number',
+      valueFormatter: (value) => value ?? 0,
+    },
+    {
+      field: 'salesPriority',
+      headerName: 'Öncelik',
+      width: 120,
+      renderCell: (params) => (
+        <Chip
+          label={getPriorityLabel(params.value)}
+          color={getPriorityColor(params.value)}
+          size="small"
+          variant="outlined"
+        />
+      ),
     },
     {
       field: 'status',
-      headerName: 'Öncelik',
-      width: 120,
-      renderCell: (params) => {
-        const color =
-          params.value === 'Yüksek'
-            ? 'error'
-            : params.value === 'Orta'
-              ? 'warning'
-              : 'success';
-
-        return (
-          <Chip
-            label={params.value}
-            color={color}
-            size="small"
-            variant="outlined"
-          />
-        );
-      },
+      headerName: 'Durum',
+      minWidth: 170,
+      flex: 1,
+      renderCell: (params) => (
+        <Chip
+          label={getStatusLabel(params.value)}
+          size="small"
+          variant="outlined"
+        />
+      ),
     },
     {
       field: 'actions',
@@ -145,12 +290,16 @@ export default function BusinessGrid() {
       width: 120,
       sortable: false,
       filterable: false,
+      disableColumnMenu: true,
       renderCell: (params) => (
         <Stack direction="row" spacing={0.5}>
           <IconButton
             size="small"
             aria-label="İşletmeyi düzenle"
-            onClick={() => handleEdit(params.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleEdit(params.id);
+            }}
           >
             <EditOutlinedIcon fontSize="small" />
           </IconButton>
@@ -159,7 +308,10 @@ export default function BusinessGrid() {
             size="small"
             color="error"
             aria-label="İşletmeyi sil"
-            onClick={() => handleDelete(params.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleDelete(params.id);
+            }}
           >
             <DeleteIcon fontSize="small" />
           </IconButton>
@@ -170,21 +322,21 @@ export default function BusinessGrid() {
 
   return (
     <Box>
-        <Stack
+      <Stack
         direction={{
           xs: 'column',
-         sm: 'row',
-         }}
+          sm: 'row',
+        }}
         spacing={2}
-          sx={{
+        sx={{
           mb: 3,
-         justifyContent: 'space-between',
-         alignItems: {
-         xs: 'flex-start',
-         sm: 'center',
-        },
-         }}
-        >
+          justifyContent: 'space-between',
+          alignItems: {
+            xs: 'flex-start',
+            sm: 'center',
+          },
+        }}
+      >
         <Box>
           <Typography
             component="h1"
@@ -203,7 +355,8 @@ export default function BusinessGrid() {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            onClick={() => setRows(initialRows)}
+            disabled={loading}
+            onClick={() => void loadBusinesses()}
           >
             Yenile
           </Button>
@@ -229,6 +382,7 @@ export default function BusinessGrid() {
         <DataGrid
           rows={rows}
           columns={columns}
+          loading={loading}
           autoHeight
           checkboxSelection
           disableRowSelectionOnClick
@@ -254,6 +408,30 @@ export default function BusinessGrid() {
           }}
         />
       </Paper>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() =>
+          setSnackbar((current) => ({
+            ...current,
+            open: false,
+          }))
+        }
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() =>
+            setSnackbar((current) => ({
+              ...current,
+              open: false,
+            }))
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
