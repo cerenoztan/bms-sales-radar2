@@ -6,26 +6,24 @@ import {
 } from 'react-router-dom';
 
 import SignIn from './pages/SignIn';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/dashboard/Dashboard';
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/signin" element={<SignIn />} />
+        <Route path="/" element={<SignIn />} />
 
         <Route
-          path="/dashboard"
+          path="/dashboard/*"
           element={<Dashboard />}
         />
 
         <Route
           path="*"
-          element={<Navigate to="/signin" replace />}
+          element={<Navigate to="/" replace />}
         />
       </Routes>
     </BrowserRouter>
   );
 }
-
-export default App;

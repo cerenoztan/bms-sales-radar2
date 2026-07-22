@@ -145,7 +145,7 @@ export default function SignIn() {
               <Typography
                 component="h1"
                 variant="h5"
-                fontWeight={700}
+                sx={{fontWeight:700}}
               >
                 BMS Sales Radar
               </Typography>
@@ -258,14 +258,6 @@ export default function SignIn() {
               Şifrenizi mi unuttunuz?
             </Link>
           </Box>
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            textAlign="center"
-          >
-            © 2026 BMS Sales Radar
-          </Typography>
         </Card>
       </SignInContainer>
     </>
