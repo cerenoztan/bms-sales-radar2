@@ -18,9 +18,8 @@ export class SourceController {
   ) {}
   @Post()
   create(@Body() createSourceDto:CreateSourceDto){
-        return this.sourceService.create(createSourceDto.businessID,createSourceDto.name,createSourceDto.url,);
+        return this.sourceService.create(createSourceDto.businessID,createSourceDto.name,createSourceDto.url,createSourceDto.externalId,);
     }
-
   @Get()
   findSources(){
     return this.sourceService.findSources();

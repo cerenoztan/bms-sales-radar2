@@ -95,7 +95,16 @@ export class SourceService{
         }
         await this.sourceRepository.remove(source);
     }
-
+    async findByExternalId(
+        externalId: string,
+        ): Promise<Source | null> {
+         return this.sourceRepository.findOne({
+          where: { externalId },
+          relations: {
+           business: true,
+          },
+        });
+    }
     
 }
 
@@ -105,4 +114,3 @@ export class SourceService{
 //Controller → receives HTTP requests and calls the service.
 
 
-//source url'leri instagram ve adres kısmında görünecek mi ??? görünsün 

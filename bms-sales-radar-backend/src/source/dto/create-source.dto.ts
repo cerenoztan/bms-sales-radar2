@@ -16,6 +16,10 @@ export class CreateSourceDto {
   @IsNotEmpty()
   name!: string;
 
-  @IsOptional()
+  @IsUrl()
   url!: string;
+
+  @IsOptional()
+  @IsString()
+  externalId?: string;
 }

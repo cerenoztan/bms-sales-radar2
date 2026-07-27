@@ -1,88 +1,74 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { Business } from '../business/business.entity';
+import { HappyGroupAdapter } from './adapters/happy-group.adapter';
 import { BusinessService } from '../business/business.service';
 import { SourceService } from '../source/source.service';
-
-import { FilgeziAdapter } from './adapters/filgezi.adapter';
-
-export interface CrawlResult {
-  discovered: number;
-  processed: number;
-  failed: number;
-  businesses: Business[];
-  errors: Array<{
-    name: string;
-    message: string;
-  }>;
-}
+import { Business } from '../business/business.entity';
+import { CrawledBusiness } from './interfaces/crawled-business.interface';
 
 @Injectable()
 export class CrawlerService {
   private readonly logger = new Logger(CrawlerService.name);
 
   constructor(
-    private readonly filgeziAdapter: FilgeziAdapter,
+    private readonly happyGroupAdapter: HappyGroupAdapter,
     private readonly businessService: BusinessService,
     private readonly sourceService: SourceService,
   ) {}
 
-  async crawlFilgezi(): Promise<CrawlResult> {
-    const crawledBusinesses =
-      await this.filgeziAdapter.crawl();
+  async previewHappyGroup() {
+    return this.happyGroupAdapter.crawl();
+  }
 
-    const savedBusinesses: Business[] = [];
+  async runHappyGroup() {
+  const crawledBusinesses =
+    await this.happyGroupAdapter.crawl();
 
-    const errors: Array<{
-      name: string;
-      message: string;
-    }> = [];
+  const createdBusinesses: Business[] = [];
+  const skippedBusinesses: CrawledBusiness[] = [];
 
-    for (const crawledBusiness of crawledBusinesses) {
-      try {
-        const business = await this.businessService.create({
-          name: crawledBusiness.name,
-          address: crawledBusiness.address,
-          phone: crawledBusiness.phone,
-          instagramUrl: crawledBusiness.instagramUrl,
-        });
-
-        await this.sourceService.create(
-          business.id,
-          crawledBusiness.sourceName,
-          crawledBusiness.sourceUrl,
-          crawledBusiness.externalId,
+  for (const crawled of crawledBusinesses) {
+    if (crawled.externalId) {
+      const existingSource =
+        await this.sourceService.findByExternalId(
+          crawled.externalId,
         );
 
-        savedBusinesses.push(business);
-
+      if (existingSource) {
         this.logger.log(
-          `Business processed: ${business.name}`,
+          `Kayıt zaten mevcut, atlandı: ${crawled.name}`,
         );
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : String(error);
 
-        errors.push({
-          name: crawledBusiness.name,
-          message,
-        });
-
-        this.logger.error(
-          `Business could not be processed: ${crawledBusiness.name}`,
-          message,
-        );
+        skippedBusinesses.push(crawled);
+        continue;
       }
     }
 
-    return {
-      discovered: crawledBusinesses.length,
-      processed: savedBusinesses.length,
-      failed: errors.length,
-      businesses: savedBusinesses,
-      errors,
-    };
+    const business = await this.businessService.create({
+      name: crawled.name,
+      phone: crawled.phone,
+      address: crawled.address,
+    });
+
+    await this.sourceService.create(
+      business.id,
+      'Happy Group',
+      crawled.sourceUrl,
+      crawled.externalId,
+    );
+
+    createdBusinesses.push(business);
+
+    this.logger.log(
+      `Business oluşturuldu: ${business.name}`,
+    );
   }
+
+  return {
+    found: crawledBusinesses.length,
+    created: createdBusinesses.length,
+    skipped: skippedBusinesses.length,
+    businesses: createdBusinesses,
+  };
+ }
 }

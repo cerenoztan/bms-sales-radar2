@@ -15,8 +15,7 @@ export class CreateBusinessDto {
   name!: string;
 
   @IsString()
-  @IsNotEmpty()
-  address!: string;
+  address?: string;
 
   @IsOptional()
   instagramUrl?: string;

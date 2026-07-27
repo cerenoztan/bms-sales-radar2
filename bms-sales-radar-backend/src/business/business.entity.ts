@@ -29,8 +29,8 @@ export class Business {
   @Column({nullable:true})
   instagramUrl?: string;
 
-  @Column()
-  address!: string;
+ @Column({nullable:true})
+  address?: string;
 
   @Column({nullable:true})//can be null
   phone?: string;

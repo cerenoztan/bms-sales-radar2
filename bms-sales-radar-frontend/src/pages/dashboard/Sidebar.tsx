@@ -8,36 +8,36 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
-
+import SettingsIcon from '@mui/icons-material/Settings';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import BusinessIcon from '@mui/icons-material/Business';
-import SourceIcon from '@mui/icons-material/TravelExplore';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
 import RadarIcon from '@mui/icons-material/Radar';
+import PeopleIcon from '@mui/icons-material/People';
 
 const drawerWidth = 260;
 
 const menuItems = [
   {
-    label: 'Dashboard',
+    label: 'Ana Sayfa',
     path: '/dashboard',
     icon: <DashboardIcon />,
   },
   {
-    label: 'İşletmeler',
-    path: '/dashboard/businesses',
-    icon: <BusinessIcon />,
-  },
-  {
-    label: 'Kaynaklar',
-    path: '/dashboard/sources',
-    icon: <SourceIcon />,
+    label: 'Kullanıcılar',
+    path: '/users',
+    icon: <PeopleIcon />,
   },
   {
     label: 'Raporlar',
     path: '/dashboard/reports',
     icon: <AssessmentIcon />,
+  },
+  {
+    label: 'Ayarlar',
+    path: '/settings',
+    icon: <SettingsIcon />,
   },
 ];
 

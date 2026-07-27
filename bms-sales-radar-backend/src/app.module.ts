@@ -7,8 +7,9 @@ import { ScoreModule } from './score/score.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { Source } from './source/source.entity';
 import { SourceModule } from './source/source.module';
-import { CrawlerModule } from './crawler/crawler.module';
 import { ConfigModule } from '@nestjs/config';
+import { GoogleModule } from './google/google.module';
+import { CrawlerModule } from './crawler/crawler.module';
 
 @Module({
   imports: [
@@ -21,13 +22,12 @@ import { ConfigModule } from '@nestjs/config';
       entities: [Business,Source],
       synchronize: true,
     }),
-
+    GoogleModule,
     BusinessModule,
+    CrawlerModule,
     ScoreModule,
     ReportModule,
     SourceModule,
-    CrawlerModule,
-
   ],
 })
 export class AppModule {}

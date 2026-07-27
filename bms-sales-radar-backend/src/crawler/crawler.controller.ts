@@ -1,26 +1,19 @@
-import {
-  Controller,
-  Get,
-  Post,
-} from '@nestjs/common';
-
-import { FilgeziAdapter } from './adapters/filgezi.adapter';
+import { Controller, Get, Post } from '@nestjs/common';
 import { CrawlerService } from './crawler.service';
 
 @Controller('crawler')
 export class CrawlerController {
   constructor(
     private readonly crawlerService: CrawlerService,
-    private readonly filgeziAdapter: FilgeziAdapter,
   ) {}
 
-  @Get('filgezi/preview')
-  previewFilgezi() {
-    return this.filgeziAdapter.crawl();
+  @Get('happy-group/preview')
+  previewHappyGroup() {
+    return this.crawlerService.previewHappyGroup();
   }
 
-  @Post('filgezi')
-  crawlFilgezi() {
-    return this.crawlerService.crawlFilgezi();
+  @Post('happy-group/run')
+  runHappyGroup() {
+    return this.crawlerService.runHappyGroup();
   }
 }

@@ -6,7 +6,8 @@ import { SourceModule } from '../source/source.module';
 
 import { CrawlerController } from './crawler.controller';
 import { CrawlerService } from './crawler.service';
-import { FilgeziAdapter } from './adapters/filgezi.adapter';
+
+import { HappyGroupAdapter } from './adapters/happy-group.adapter';
 
 @Module({
   imports: [
@@ -17,8 +18,11 @@ import { FilgeziAdapter } from './adapters/filgezi.adapter';
   controllers: [CrawlerController],
   providers: [
     CrawlerService,
-    FilgeziAdapter,
+    HappyGroupAdapter,
   ],
-  exports:[CrawlerService,],
+  exports: [
+    CrawlerService,
+    HappyGroupAdapter,
+  ],
 })
 export class CrawlerModule {}

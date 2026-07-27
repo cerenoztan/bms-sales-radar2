@@ -4,17 +4,13 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { DataGrid } from '@mui/x-data-grid';
 
@@ -28,7 +24,7 @@ const API_URL = 'http://localhost:3000';
 interface BusinessRow {
   id: number;
   name: string;
-  address: string;
+  address?: string | null;
   phone?: string | null;
   instagramUrl?: string | null;
   score?: number;
@@ -112,6 +108,9 @@ export default function BusinessGrid() {
   const [rows, setRows] = React.useState<BusinessRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
+  const [selectedRowId, setSelectedRowId] =
+    React.useState<GridRowId | null>(null);
+
   const [snackbar, setSnackbar] = React.useState<SnackbarState>({
     open: false,
     message: '',
@@ -153,58 +152,8 @@ export default function BusinessGrid() {
     void loadBusinesses();
   }, [loadBusinesses]);
 
-  const handleCreate = () => {
-    alert('Yeni işletme formu sonraki adımda eklenecek.');
-  };
-
   const handleEdit = (id: GridRowId) => {
     alert(`${id} numaralı işletme düzenlenecek.`);
-  };
-
-  const handleDelete = async (id: GridRowId) => {
-    const shouldDelete = window.confirm(
-      'Bu işletmeyi silmek istediğinize emin misiniz?',
-    );
-
-    if (!shouldDelete) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${API_URL}/businesses/${id}`,
-        {
-          method: 'DELETE',
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `İşletme silinemedi. HTTP ${response.status}`,
-        );
-      }
-
-      setRows((currentRows) =>
-        currentRows.filter((row) => row.id !== Number(id)),
-      );
-
-      setSnackbar({
-        open: true,
-        message: 'İşletme başarıyla silindi.',
-        severity: 'success',
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'İşletme silinirken bir hata oluştu.';
-
-      setSnackbar({
-        open: true,
-        message,
-        severity: 'error',
-      });
-    }
   };
 
   const columns: GridColDef<BusinessRow>[] = [
@@ -212,13 +161,14 @@ export default function BusinessGrid() {
       field: 'name',
       headerName: 'İşletme',
       flex: 1.3,
-      minWidth: 180,
+      minWidth: 220,
     },
     {
       field: 'address',
       headerName: 'Adres',
       flex: 1.8,
       minWidth: 240,
+      valueFormatter: (value) => value ?? '-',
     },
     {
       field: 'phone',
@@ -231,7 +181,7 @@ export default function BusinessGrid() {
       field: 'instagramUrl',
       headerName: 'Instagram',
       flex: 1.2,
-      minWidth: 180,
+      minWidth: 150,
       sortable: false,
       renderCell: (params) => {
         if (!params.value) {
@@ -284,40 +234,6 @@ export default function BusinessGrid() {
         />
       ),
     },
-    {
-      field: 'actions',
-      headerName: 'İşlemler',
-      width: 120,
-      sortable: false,
-      filterable: false,
-      disableColumnMenu: true,
-      renderCell: (params) => (
-        <Stack direction="row" spacing={0.5}>
-          <IconButton
-            size="small"
-            aria-label="İşletmeyi düzenle"
-            onClick={(event) => {
-              event.stopPropagation();
-              handleEdit(params.id);
-            }}
-          >
-            <EditOutlinedIcon fontSize="small" />
-          </IconButton>
-
-          <IconButton
-            size="small"
-            color="error"
-            aria-label="İşletmeyi sil"
-            onClick={(event) => {
-              event.stopPropagation();
-              void handleDelete(params.id);
-            }}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      ),
-    },
   ];
 
   return (
@@ -343,38 +259,34 @@ export default function BusinessGrid() {
             variant="h4"
             sx={{ fontWeight: 700 }}
           >
-            İşletmeler
+            Yeni Açılacak İşletmeler
           </Typography>
 
           <Typography sx={{ color: 'text.secondary' }}>
-            Potansiyel müşterileri görüntüleyin ve yönetin.
+            Haftalık Tablo
           </Typography>
         </Box>
 
-        <Stack direction="row" spacing={1}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            disabled={loading}
-            onClick={() => void loadBusinesses()}
-          >
-            Yenile
-          </Button>
-
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-          >
-            Yeni işletme
-          </Button>
-        </Stack>
+        <Button
+          variant="contained"
+          startIcon={<EditOutlinedIcon />}
+          disabled={selectedRowId === null}
+          onClick={() => {
+            if (selectedRowId !== null) {
+              handleEdit(selectedRowId);
+            }
+          }}
+        >
+          Düzenle
+        </Button>
       </Stack>
 
       <Paper
         variant="outlined"
         sx={{
           width: '100%',
+          height: 'calc(100vh - 180px)',
+          minHeight: 480,
           overflow: 'hidden',
           borderRadius: 3,
         }}
@@ -383,10 +295,10 @@ export default function BusinessGrid() {
           rows={rows}
           columns={columns}
           loading={loading}
-          autoHeight
-          checkboxSelection
-          disableRowSelectionOnClick
-          pageSizeOptions={[5, 10, 25]}
+          onRowClick={(params) => {
+            setSelectedRowId(params.id);
+          }}
+          pageSizeOptions={[10, 25, 50]}
           initialState={{
             pagination: {
               paginationModel: {
@@ -397,6 +309,7 @@ export default function BusinessGrid() {
           }}
           sx={{
             border: 0,
+            height: '100%',
 
             '& .MuiDataGrid-columnHeaders': {
               bgcolor: 'grey.50',
@@ -404,6 +317,14 @@ export default function BusinessGrid() {
 
             '& .MuiDataGrid-cell:focus': {
               outline: 'none',
+            },
+
+            '& .MuiDataGrid-columnHeader:focus': {
+              outline: 'none',
+            },
+
+            '& .MuiDataGrid-row': {
+              cursor: 'pointer',
             },
           }}
         />
