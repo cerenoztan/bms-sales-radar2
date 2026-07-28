@@ -16,4 +16,12 @@ export class CrawlerController {
   runHappyGroup() {
     return this.crawlerService.runHappyGroup();
   }
+  @Get('retail/preview')
+   previewRetailTurkiye() {
+  return this.crawlerService.previewRetailTurkiye();
+  } 
+  @Post('retail/run')
+   runRetailTurkiye() {
+   return this.crawlerService.runRetailTurkiye();
+  }
 }

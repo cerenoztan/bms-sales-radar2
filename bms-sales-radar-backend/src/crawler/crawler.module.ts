@@ -8,6 +8,7 @@ import { CrawlerController } from './crawler.controller';
 import { CrawlerService } from './crawler.service';
 
 import { HappyGroupAdapter } from './adapters/happy-group.adapter';
+import { RetailTurkiyeAdapter } from './adapters/retail-türkiye.adapter';
 
 @Module({
   imports: [
@@ -19,10 +20,12 @@ import { HappyGroupAdapter } from './adapters/happy-group.adapter';
   providers: [
     CrawlerService,
     HappyGroupAdapter,
+    RetailTurkiyeAdapter,
   ],
   exports: [
     CrawlerService,
     HappyGroupAdapter,
+    RetailTurkiyeAdapter,
   ],
 })
 export class CrawlerModule {}

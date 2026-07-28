@@ -83,20 +83,20 @@ export class GoogleService {
   }
   async searchFutureBusinessesInIstanbul(
   type: 'cafe' | 'restaurant',
-): Promise<GooglePlace[]> {
-  const results: GooglePlace[] = [];
+    ) : Promise<GooglePlace[]> {
+    const results: GooglePlace[] = [];
 
-  for (const district of ISTANBUL_DISTRICTS) {
-    const places = await this.searchFutureBusinesses(
+     for (const district of ISTANBUL_DISTRICTS) {
+      const places = await this.searchFutureBusinesses(
       `${district} İstanbul`,
       type,
     );
 
-    results.push(...places);
-  }
+      results.push(...places);
+     }
 
-  return Array.from(
-    new Map(results.map(place => [place.id, place])).values(),
-  );
-}
+     return Array.from(
+     new Map(results.map(place => [place.id, place])).values(),
+         );
+    }
 }
