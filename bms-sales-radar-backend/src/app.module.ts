@@ -10,6 +10,9 @@ import { SourceModule } from './source/source.module';
 import { ConfigModule } from '@nestjs/config';
 import { GoogleModule } from './google/google.module';
 import { CrawlerModule } from './crawler/crawler.module';
+import { UsersModule } from './users/users.module';
+import { User } from './users/users.entity';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -19,7 +22,7 @@ import { CrawlerModule } from './crawler/crawler.module';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
-      entities: [Business,Source],
+      entities: [Business,Source,User,],
       synchronize: true,
     }),
     GoogleModule,
@@ -28,6 +31,8 @@ import { CrawlerModule } from './crawler/crawler.module';
     ScoreModule,
     ReportModule,
     SourceModule,
+    UsersModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

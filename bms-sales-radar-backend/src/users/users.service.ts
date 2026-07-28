@@ -1,0 +1,182 @@
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+
+import { User, UserRole } from './users.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  async create(
+    dto: CreateUserDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const normalizedEmail = dto.email
+      .trim()
+      .toLocaleLowerCase('tr-TR');
+
+    const existingUser =
+      await this.userRepository.findOne({
+        where: {
+          email: normalizedEmail,
+        },
+      });
+
+    if (existingUser) {
+      throw new ConflictException(
+        'Bu e-posta adresi zaten kullanılıyor.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(
+      dto.password,
+      12,
+    );
+
+    const user = this.userRepository.create({
+      fullName: dto.fullName.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      role: dto.role ?? UserRole.SALES_REP,
+      isActive: dto.isActive ?? true,
+    });
+
+    const savedUser =
+      await this.userRepository.save(user);
+
+    return this.removePasswordHash(savedUser);
+  }
+
+  async findAll(): Promise<
+    Array<Omit<User, 'passwordHash'>>
+  > {
+    const users = await this.userRepository.find({
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    return users.map((user) =>
+      this.removePasswordHash(user),
+    );
+  }
+
+  async findOne(
+    id: number,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.findEntityById(id);
+
+    return this.removePasswordHash(user);
+  }
+
+  async findByEmail(
+    email: string,
+  ): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: {
+        email: email
+          .trim()
+          .toLocaleLowerCase('tr-TR'),
+      },
+    });
+  }
+
+  async update(
+    id: number,
+    dto: UpdateUserDto,
+  ): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.findEntityById(id);
+
+    if (dto.email) {
+      const normalizedEmail = dto.email
+        .trim()
+        .toLocaleLowerCase('tr-TR');
+
+      const existingUser =
+        await this.userRepository.findOne({
+          where: {
+            email: normalizedEmail,
+          },
+        });
+
+      if (
+        existingUser &&
+        existingUser.id !== id
+      ) {
+        throw new ConflictException(
+          'Bu e-posta adresi zaten kullanılıyor.',
+        );
+      }
+
+      user.email = normalizedEmail;
+    }
+
+    if (dto.fullName !== undefined) {
+      user.fullName = dto.fullName.trim();
+    }
+
+    if (dto.password !== undefined) {
+      user.passwordHash = await bcrypt.hash(
+        dto.password,
+        12,
+      );
+    }
+
+    if (dto.role !== undefined) {
+      user.role = dto.role;
+    }
+
+    if (dto.isActive !== undefined) {
+      user.isActive = dto.isActive;
+    }
+
+    const updatedUser =
+      await this.userRepository.save(user);
+
+    return this.removePasswordHash(updatedUser);
+  }
+
+  async remove(id: number): Promise<void> {
+    const user = await this.findEntityById(id);
+
+    await this.userRepository.remove(user);
+  }
+
+  private async findEntityById(
+    id: number,
+  ): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: {
+        id,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        'Kullanıcı bulunamadı.',
+      );
+    }
+
+    return user;
+  }
+  private removePasswordHash(
+    user: User,
+  ): Omit<User, 'passwordHash'> {
+    const {
+      passwordHash: _passwordHash,
+      ...safeUser
+    } = user;
+
+    return safeUser;
+  }
+}

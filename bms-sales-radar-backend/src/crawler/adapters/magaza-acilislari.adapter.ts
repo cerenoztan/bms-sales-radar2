@@ -141,16 +141,30 @@ export class MagazaAcilislariAdapter {
           .find('.entry-title a')
           .first();
 
-        const name = this.cleanText(
+        const title = this.cleanText(
           titleElement.text(),
         );
 
         const href =
           titleElement.attr('href');
 
-        if (!name || !href) {
+        if (!title || !href) {
           return;
         }
+
+        const {
+          name,
+          address,
+        } = this.splitBusinessTitle(
+          title,
+        );
+
+        const formattedName =
+          this.formatWords(name);
+
+        const formattedAddress = address
+          ? this.formatWords(address)
+          : undefined;
 
         const dateElement = article
           .find(
@@ -175,7 +189,7 @@ export class MagazaAcilislariAdapter {
 
         const searchableText =
           this.normalizeText(
-            `${name} ${excerpt}`,
+            `${title} ${excerpt}`,
           );
 
         const isIstanbul =
@@ -196,11 +210,13 @@ export class MagazaAcilislariAdapter {
           this.toAbsoluteUrl(href);
 
         businesses.push({
-          name,
+          name: formattedName,
+          address: formattedAddress,
           sourceUrl,
           externalId: sourceUrl,
           openingStatus: 'OPENING',
           rawData: {
+            originalTitle: title,
             date: date || undefined,
             excerpt:
               excerpt || undefined,
@@ -212,6 +228,79 @@ export class MagazaAcilislariAdapter {
     );
 
     return businesses;
+  }
+
+  private splitBusinessTitle(
+    title: string,
+  ): {
+    name: string;
+    address?: string;
+  } {
+    const separators = [
+      ' - ',
+      ', ',
+    ];
+
+    for (const separator of separators) {
+      const separatorIndex =
+        title.indexOf(separator);
+
+      if (separatorIndex === -1) {
+        continue;
+      }
+
+      const name = title
+        .slice(0, separatorIndex)
+        .trim();
+
+      const address = title
+        .slice(
+          separatorIndex +
+            separator.length,
+        )
+        .trim();
+
+      if (name && address) {
+        return {
+          name,
+          address,
+        };
+      }
+    }
+
+    return {
+      name: title.trim(),
+    };
+  }
+
+  private formatWords(
+    value: string,
+  ): string {
+    return this.cleanText(value)
+      .toLocaleLowerCase('tr-TR')
+      .split(' ')
+      .map((word) =>
+        this.capitalizeWord(word),
+      )
+      .join(' ');
+  }
+
+  private capitalizeWord(
+    word: string,
+  ): string {
+    if (!word) {
+      return word;
+    }
+
+    const firstLetter =
+      word.charAt(0)
+        .toLocaleUpperCase('tr-TR');
+
+    const remainingLetters =
+      word.slice(1)
+        .toLocaleLowerCase('tr-TR');
+
+    return `${firstLetter}${remainingLetters}`;
   }
 
   private getNextPageUrl(
