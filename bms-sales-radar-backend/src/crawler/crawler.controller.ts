@@ -16,12 +16,24 @@ export class CrawlerController {
   runHappyGroup() {
     return this.crawlerService.runHappyGroup();
   }
+
   @Get('retail/preview')
-   previewRetailTurkiye() {
-  return this.crawlerService.previewRetailTurkiye();
-  } 
+  previewRetailTurkiye() {
+    return this.crawlerService.previewRetailTurkiye();
+  }
+
   @Post('retail/run')
-   runRetailTurkiye() {
-   return this.crawlerService.runRetailTurkiye();
+  runRetailTurkiye() {
+    return this.crawlerService.runRetailTurkiye();
+  }
+
+  @Get('magaza-acilislari/preview')
+  previewMagazaAcilislari() {
+    return this.crawlerService.previewMagazaAcilislari();
+  }
+
+  @Post('magaza-acilislari/run')
+  runMagazaAcilislari() {
+    return this.crawlerService.runMagazaAcilislari();
   }
 }

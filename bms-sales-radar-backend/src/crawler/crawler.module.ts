@@ -9,6 +9,7 @@ import { CrawlerService } from './crawler.service';
 
 import { HappyGroupAdapter } from './adapters/happy-group.adapter';
 import { RetailTurkiyeAdapter } from './adapters/retail-türkiye.adapter';
+import { MagazaAcilislariAdapter } from './adapters/magaza-acilislari.adapter';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RetailTurkiyeAdapter } from './adapters/retail-türkiye.adapter';
     CrawlerService,
     HappyGroupAdapter,
     RetailTurkiyeAdapter,
+    MagazaAcilislariAdapter,
   ],
   exports: [
     CrawlerService,
