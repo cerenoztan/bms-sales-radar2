@@ -37,10 +37,8 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
   padding: theme.spacing(2),
   justifyContent: 'center',
   alignItems: 'center',
-
   backgroundImage:
     "linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/background.jpg')",
-
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',
@@ -51,13 +49,25 @@ const SignInContainer = styled(Stack)(({ theme }) => ({
 }));
 
 export default function SignIn() {
-  const navigate=useNavigate();
-  const [emailError, setEmailError] = React.useState(false);
-  const [emailErrorMessage, setEmailErrorMessage] = React.useState('');
+  const navigate = useNavigate();
 
-  const [passwordError, setPasswordError] = React.useState(false);
-  const [passwordErrorMessage, setPasswordErrorMessage] =
+  const [emailError, setEmailError] =
+    React.useState(false);
+  const [emailErrorMessage, setEmailErrorMessage] =
     React.useState('');
+
+  const [passwordError, setPasswordError] =
+    React.useState(false);
+  const [
+    passwordErrorMessage,
+    setPasswordErrorMessage,
+  ] = React.useState('');
+
+  const [loginError, setLoginError] =
+    React.useState('');
+
+  const [isLoading, setIsLoading] =
+    React.useState(false);
 
   const validateInputs = (
     email: string,
@@ -90,27 +100,93 @@ export default function SignIn() {
     return isValid;
   };
 
-  const handleSubmit = (
+  const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(
+      event.currentTarget,
+    );
 
-    const email = String(formData.get('email') ?? '');
-    const password = String(formData.get('password') ?? '');
+    const email = String(
+      formData.get('email') ?? '',
+    )
+      .trim()
+      .toLowerCase();
 
-    const isValid = validateInputs(email, password);
+    const password = String(
+      formData.get('password') ?? '',
+    );
+
+    const remember =
+      formData.get('remember') === 'on';
+
+    const isValid = validateInputs(
+      email,
+      password,
+    );
 
     if (!isValid) {
       return;
     }
 
-    console.log({
-      email,
-      password,
-    });
-    navigate('/dashboard');
+    setLoginError('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        'http://localhost:3000/auth/login',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email,
+            password,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(data.message)
+            ? data.message.join(' ')
+            : data.message ||
+                'Giriş sırasında bir hata oluştu.',
+        );
+      }
+
+      const storage = remember
+        ? localStorage
+        : sessionStorage;
+
+      storage.setItem(
+        'accessToken',
+        data.accessToken,
+      );
+
+      storage.setItem(
+        'user',
+        JSON.stringify(data.user),
+      );
+
+      navigate('/dashboard', {
+        replace: true,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Sunucuya bağlanılamadı.';
+
+      setLoginError(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -145,7 +221,7 @@ export default function SignIn() {
               <Typography
                 component="h1"
                 variant="h5"
-                sx={{fontWeight:700}}
+                sx={{ fontWeight: 700 }}
               >
                 BMS Sales Radar
               </Typography>
@@ -163,7 +239,8 @@ export default function SignIn() {
             component="h2"
             variant="h4"
             sx={{
-              fontSize: 'clamp(2rem, 10vw, 2.15rem)',
+              fontSize:
+                'clamp(2rem, 10vw, 2.15rem)',
             }}
           >
             Giriş yap
@@ -197,7 +274,11 @@ export default function SignIn() {
                 required
                 fullWidth
                 variant="outlined"
-                color={emailError ? 'error' : 'primary'}
+                color={
+                  emailError
+                    ? 'error'
+                    : 'primary'
+                }
               />
             </FormControl>
 
@@ -217,9 +298,23 @@ export default function SignIn() {
                 required
                 fullWidth
                 variant="outlined"
-                color={passwordError ? 'error' : 'primary'}
+                color={
+                  passwordError
+                    ? 'error'
+                    : 'primary'
+                }
               />
             </FormControl>
+
+            {loginError && (
+              <Typography
+                role="alert"
+                color="error"
+                variant="body2"
+              >
+                {loginError}
+              </Typography>
+            )}
 
             <FormControlLabel
               control={
@@ -236,12 +331,15 @@ export default function SignIn() {
               fullWidth
               variant="contained"
               size="large"
+              disabled={isLoading}
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
               }}
             >
-              Giriş yap
+              {isLoading
+                ? 'Giriş yapılıyor...'
+                : 'Giriş yap'}
             </Button>
 
             <Link
