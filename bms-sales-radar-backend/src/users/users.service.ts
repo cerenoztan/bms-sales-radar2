@@ -48,6 +48,7 @@ export class UsersService {
       email: normalizedEmail,
       passwordHash,
       role: dto.role ?? UserRole.SALES_REP,
+      jobTitle:dto.jobTitle,
       isActive: dto.isActive ?? true,
     });
 

@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
@@ -8,13 +8,13 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
-import SettingsIcon from '@mui/icons-material/Settings';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import BusinessIcon from '@mui/icons-material/Business';
+
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import LogoutIcon from '@mui/icons-material/Logout';
-import RadarIcon from '@mui/icons-material/Radar';
 import PeopleIcon from '@mui/icons-material/People';
+import RadarIcon from '@mui/icons-material/Radar';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 const drawerWidth = 260;
 
@@ -26,7 +26,7 @@ const menuItems = [
   },
   {
     label: 'Kullanıcılar',
-    path: '/users',
+    path: '/dashboard/users',
     icon: <PeopleIcon />,
   },
   {
@@ -36,7 +36,7 @@ const menuItems = [
   },
   {
     label: 'Ayarlar',
-    path: '/settings',
+    path: '/dashboard/settings',
     icon: <SettingsIcon />,
   },
 ];
@@ -46,7 +46,15 @@ export default function Sidebar() {
   const location = useLocation();
 
   const handleLogout = () => {
-    navigate('/');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('user');
+
+    navigate('/', {
+      replace: true,
+    });
   };
 
   return (
@@ -107,7 +115,8 @@ export default function Sidebar() {
 
       <List sx={{ px: 1.5, py: 2 }}>
         {menuItems.map((item) => {
-          const selected = location.pathname === item.path;
+          const selected =
+            location.pathname === item.path;
 
           return (
             <ListItemButton

@@ -44,4 +44,15 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({
+  type: 'varchar',
+  length: 150,
+  nullable: true,
+  })
+  jobTitle?: string;
+
 }
+
+//role:yetki seviyesi
+//jobTitle:şirketteki görev

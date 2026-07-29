@@ -25,6 +25,10 @@ export class CreateUserDto {
   role?: UserRole;
 
   @IsOptional()
+  @IsString()
+  jobTitle?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

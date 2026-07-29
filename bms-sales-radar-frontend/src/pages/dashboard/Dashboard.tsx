@@ -1,5 +1,12 @@
 import Box from '@mui/material/Box';
 
+import {
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom';
+
+import UsersPage from '../users/UsersPage';
 import Sidebar from './Sidebar';
 import BusinessGrid from './BusinessGrid';
 
@@ -25,7 +32,32 @@ export default function Dashboard() {
           },
         }}
       >
-        <BusinessGrid />
+        <Routes>
+          <Route
+            index
+            element={<BusinessGrid />}
+          />
+
+          <Route
+            path="businesses"
+            element={<BusinessGrid />}
+          />
+
+          <Route
+            path="users"
+            element={<UsersPage />}
+          />
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            }
+          />
+        </Routes>
       </Box>
     </Box>
   );
