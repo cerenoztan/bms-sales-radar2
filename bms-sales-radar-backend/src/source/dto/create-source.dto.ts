@@ -8,9 +8,11 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateSourceDto {
+  
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  businessID!: number;
+  businessID?: number;
 
   @IsString()
   @IsNotEmpty()

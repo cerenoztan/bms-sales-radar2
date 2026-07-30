@@ -21,16 +21,17 @@ export class Source{
     @Column({ nullable: true })
     externalId?:string;
  
-    @Column()
+    @Column({unique:true})
     url!:string;
 
 
     // the relationship will be with Business entity
     //at Business entity sources represent the relationship
     @ManyToOne(() => Business,(business)=> business.sources,{
-        onDelete:'CASCADE',
+        nullable:true,
+        onDelete:'SET NULL',
     })
-    business!:Business;
+    business?:Business;
 
 }
 

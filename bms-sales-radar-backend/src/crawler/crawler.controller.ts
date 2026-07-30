@@ -1,4 +1,11 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Query,
+} from '@nestjs/common';
+
 import { CrawlerService } from './crawler.service';
 
 @Controller('crawler')
@@ -7,33 +14,33 @@ export class CrawlerController {
     private readonly crawlerService: CrawlerService,
   ) {}
 
-  @Get('happy-group/preview')
-  previewHappyGroup() {
-    return this.crawlerService.previewHappyGroup();
+  @Get('google/preview')
+  previewGoogleSearch(
+    @Query('keyword') keyword?: string,
+  ) {
+    if (!keyword?.trim()) {
+      throw new BadRequestException(
+        'keyword parametresi zorunludur.',
+      );
+    }
+
+    return this.crawlerService.previewGoogleSearch(
+      keyword.trim(),
+    );
   }
 
-  @Post('happy-group/run')
-  runHappyGroup() {
-    return this.crawlerService.runHappyGroup();
-  }
+  @Post('google/run')
+  runGoogleSearch(
+    @Query('keyword') keyword?: string,
+  ) {
+    if (!keyword?.trim()) {
+      throw new BadRequestException(
+        'keyword parametresi zorunludur.',
+      );
+    }
 
-  @Get('retail/preview')
-  previewRetailTurkiye() {
-    return this.crawlerService.previewRetailTurkiye();
-  }
-
-  @Post('retail/run')
-  runRetailTurkiye() {
-    return this.crawlerService.runRetailTurkiye();
-  }
-
-  @Get('magaza-acilislari/preview')
-  previewMagazaAcilislari() {
-    return this.crawlerService.previewMagazaAcilislari();
-  }
-
-  @Post('magaza-acilislari/run')
-  runMagazaAcilislari() {
-    return this.crawlerService.runMagazaAcilislari();
+    return this.crawlerService.runGoogleSearch(
+      keyword.trim(),
+    );
   }
 }

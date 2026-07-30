@@ -19,48 +19,51 @@ export class SourceService{
     ){}
 
     async create(
-        businessID:number,
-        name:string,
-        url:string,
-        externalId?:string,
-    ):Promise<Source>{
-        const existingSource=externalId ? await this.sourceRepository.findOne({
+     name: string,
+    url: string,
+    externalId?: string,
+    businessID?: number,
+        ): Promise<Source> {
+     const existingSource = externalId
+     ? await this.sourceRepository.findOne({
+        where: { externalId },
+        relations: { business: true },
+      })
+    : await this.sourceRepository.findOne({
+        where: { url },
+        relations: { business: true },
+      });
 
-            where:{
-                externalId,
-            },
-            relations:{
-                business:true,
-            },})
-            :await this.sourceRepository.findOne({
-            where:{
-                url,
-            },
-            relations:{
-                business:true,
-            },
-        });
-        if(existingSource){
-            return existingSource;
-        }
-
-        //the actual Business object from the database
-        //TypeORM takes the ID and stores into businessID
-        const business= await this.businessRepository.findOneBy({id:businessID,});
-        if(!business){
-            throw new NotFoundException(
-              `Business with ID ${businessID} was not found`
-            );
-        }
-        const source=this.sourceRepository.create({
-            name,
-            url,
-            business,
-            externalId,
-        });
-        return this.sourceRepository.save(source);
+    if (existingSource) {
+    return existingSource;
     }
 
+    let business: Business | undefined;
+
+    if (businessID !== undefined) {
+    const foundBusiness =
+      await this.businessRepository.findOneBy({
+        id: businessID,
+      });
+
+    if (!foundBusiness) {
+      throw new NotFoundException(
+        `Business with ID ${businessID} was not found`,
+      );
+    }
+
+    business = foundBusiness;
+    }
+
+    const source = this.sourceRepository.create({
+    name,
+    url,
+    externalId,
+    business,
+    });
+
+        return this.sourceRepository.save(source);
+    }
     async findSources():Promise<Source[]>{
         return this.sourceRepository.find({
             //relations shows the relationship that is defined with one to many and many to one
@@ -105,6 +108,18 @@ export class SourceService{
           },
         });
     }
+    async findByUrl(
+  url: string,
+ ): Promise<Source | null> {
+  return this.sourceRepository.findOne({
+    where: { url },
+    relations: {
+      business: true,
+    },
+  });
+ }   
+
+
     
 }
 
