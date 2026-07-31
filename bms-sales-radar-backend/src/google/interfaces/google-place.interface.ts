@@ -1,8 +1,3 @@
-export interface GoogleOpeningDate {
-  year?: number;
-  month?: number;
-  day?: number;
-}
 
 export interface GooglePlace {
   id: string;
@@ -12,9 +7,13 @@ export interface GooglePlace {
     languageCode?: string;
   };
 
-  formattedAddress?: string;
-  primaryType?: string;
-  businessStatus?: string;
-  openingDate?: GoogleOpeningDate;
+  formattedAddress?:string;
   googleMapsUri?: string;
+}
+
+export interface DistrictPlaceResult {
+  district: string;
+  places: GooglePlace[];
+  success: boolean;
+  error?: unknown;
 }

@@ -343,17 +343,13 @@ export default function SignIn() {
             </Button>
 
             <Link
-              component="button"
-              type="button"
-              variant="body2"
-              sx={{ alignSelf: 'center' }}
-              onClick={() => {
-                alert(
-                  'Şifre yenileme özelliği daha sonra eklenecek.',
-                );
-              }}
+            component="button"
+            type="button"
+            variant="body2"
+            sx={{ alignSelf: 'center' }}
+            onClick={() => navigate('/forgot-password')}
             >
-              Şifrenizi mi unuttunuz?
+            Şifrenizi mi unuttunuz?
             </Link>
           </Box>
         </Card>

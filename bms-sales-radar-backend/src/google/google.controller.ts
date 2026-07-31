@@ -1,45 +1,43 @@
 import {
-  BadRequestException,
   Controller,
   Get,
   Query,
 } from '@nestjs/common';
 
-import { GoogleService } from './google.service';
-import { GooglePlace } from './interfaces/google-place.interface';
+import {
+  DistrictPlaceResult,
+  GoogleService,
+} from './google-place.service';
 import { GoogleSearchService } from './google-search.service';
 import { GoogleSearchResult } from './interfaces/google-search.interface';
 
 @Controller('google')
 export class GoogleController {
-  constructor(private readonly googleService: GoogleService,
-    private readonly googleSearchService:GoogleSearchService,
+  constructor(
+    private readonly googleService: GoogleService,
+    private readonly googleSearchService: GoogleSearchService,
   ) {}
 
   @Get('istanbul-businesses')
-  async searchBusinesses(
-    @Query('type') type?: 'cafe' | 'restaurant',
-  ): Promise<GooglePlace[]> {
-    if (!type || !['cafe', 'restaurant'].includes(type)) {
-      throw new BadRequestException(
-        'type yalnızca cafe veya restaurant olabilir.',
-      );
-    }
-
-    return this.googleService.searchBusinessesInIstanbul(type);
+  async searchBusinesses(): Promise<DistrictPlaceResult[]> {
+    return this.googleService.searchBusinessesInIstanbul();
   }
-   @Get('web-search')
-  async webSearch(
-  @Query('keyword') keyword?: string,
+
+  @Get('new-businesses')
+  findNewBusinesses() {
+    return this.googleService.findNewBusinesses();
+  }
+
+  @Get('search')
+  searchGoogle(
+    @Query('keyword') keyword: string,
+    @Query('limit') limit?: string,
   ): Promise<GoogleSearchResult[]> {
-  if (!keyword?.trim()) {
-    throw new BadRequestException(
-      'keyword parametresi zorunludur.',
-    );
-  }
+    const parsedLimit = Number(limit);
 
-   return this.googleSearchService.search(
-    keyword,
-  );
+    return this.googleSearchService.search(
+      keyword,
+      Number.isFinite(parsedLimit) ? parsedLimit : 10,
+    );
   }
 }

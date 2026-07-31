@@ -146,6 +146,19 @@ export class UsersService {
 
     return this.removePasswordHash(updatedUser);
   }
+  async updatePassword(
+  id: number,
+  password: string,
+  ): Promise<void> {
+  const user = await this.findEntityById(id);
+
+  user.passwordHash = await bcrypt.hash(
+    password,
+    12,
+  );
+
+  await this.userRepository.save(user);
+  }
 
   async remove(id: number): Promise<void> {
     const user = await this.findEntityById(id);

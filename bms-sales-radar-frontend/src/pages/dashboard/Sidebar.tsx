@@ -8,7 +8,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
-
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -30,6 +30,11 @@ const menuItems = [
     icon: <PeopleIcon />,
   },
   {
+    label: 'Rol Tanımlama',
+    path: '/dashboard/roles',
+    icon: <AdminPanelSettingsIcon />,
+  },
+  {
     label: 'Raporlar',
     path: '/dashboard/reports',
     icon: <AssessmentIcon />,
@@ -39,6 +44,7 @@ const menuItems = [
     path: '/dashboard/settings',
     icon: <SettingsIcon />,
   },
+
 ];
 
 export default function Sidebar() {

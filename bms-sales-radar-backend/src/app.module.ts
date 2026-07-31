@@ -13,6 +13,7 @@ import { CrawlerModule } from './crawler/crawler.module';
 import { UsersModule } from './users/users.module';
 import { User } from './users/users.entity';
 import { AuthModule } from './auth/auth.module';
+import { GooglePlaceEntity } from './google/entities/google-place.entity';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { AuthModule } from './auth/auth.module';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
-      entities: [Business,Source,User,],
+      entities: [Business,Source,User,GooglePlaceEntity],
       synchronize: true,
     }),
     GoogleModule,

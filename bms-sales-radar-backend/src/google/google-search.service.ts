@@ -6,7 +6,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-
+import { AxiosError } from 'axios';
 import { GoogleSearchResult } from './interfaces/google-search.interface';
 
 interface GoogleCustomSearchItem {
@@ -54,6 +54,9 @@ export class GoogleSearchService {
       this.configService.get<string>(
         'GOOGLE_ENGINE_ID',
       );
+      
+    console.log('API KEY:', this.configService.get('GOOGLE_API_KEY'));
+    console.log('CX:', this.configService.get('GOOGLE_ENGINE_ID'));
 
     if (!apiKey || !searchEngineId) {
       throw new ServiceUnavailableException(
@@ -102,21 +105,38 @@ export class GoogleSearchService {
 
       return this.removeDuplicates(results);
     } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Bilinmeyen hata';
+  if (error instanceof AxiosError) {
+    const status = error.response?.status;
+    const responseData = error.response?.data;
 
-      this.logger.error(
-        `Google Search API hatası: ${message}`,
-      );
+    this.logger.error(
+      `Google Search API hatası
+Status: ${status ?? 'bilinmiyor'}
+Response: ${JSON.stringify(responseData, null, 2)}`,
+    );
 
-      throw new ServiceUnavailableException({
-        message:
-          'Google arama sonuçları alınamadı.',
-        detail: message,
-      });
-    }
+    throw new ServiceUnavailableException({
+      message: 'Google arama sonuçları alınamadı.',
+      googleStatus: status,
+      googleError: responseData,
+    });
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : 'Bilinmeyen hata';
+
+  this.logger.error(
+    `Google Search API beklenmeyen hata: ${message}`,
+    error instanceof Error ? error.stack : undefined,
+  );
+
+  throw new ServiceUnavailableException({
+    message: 'Google arama sonuçları alınamadı.',
+    detail: message,
+  });
+}
   }
 
   private removeDuplicates(
