@@ -10,6 +10,7 @@ import SignIn from './pages/SignIn';
 import Dashboard from './pages/dashboard/Dashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import PermissionsPage from './pages/permissions/PermissionsPage';
 
 export default function App() {
   return (
@@ -29,6 +30,10 @@ export default function App() {
         <Route
           path="/dashboard/*"
           element={<Dashboard />}
+        />
+        <Route
+        path="/permissions"
+        element={<PermissionsPage />}
         />
 
         <Route

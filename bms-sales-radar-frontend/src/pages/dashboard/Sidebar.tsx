@@ -35,6 +35,11 @@ const menuItems = [
     icon: <AdminPanelSettingsIcon />,
   },
   {
+    label: "Yetkilendirme",
+    path: '/permissions',
+    icon: <AdminPanelSettingsIcon/>,
+  },
+  {
     label: 'Raporlar',
     path: '/dashboard/reports',
     icon: <AssessmentIcon />,
