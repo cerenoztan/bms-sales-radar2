@@ -1,7 +1,7 @@
 import {
   IsBoolean,
   IsEmail,
-  IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   MinLength,
@@ -19,6 +19,8 @@ export class CreateUserDto {
   @MinLength(6)
   password!: string;
 
+  @IsOptional()
+  @IsInt()
   roleId?:number;
 
   @IsOptional()

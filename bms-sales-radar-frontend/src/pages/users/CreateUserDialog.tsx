@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import * as React from 'react';
 
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -7,16 +7,22 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import FormControlLabel from '@mui/material/FormControlLabel';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 
-type UserRole =
-  | 'ADMIN'
-  | 'SALES_MANAGER'
-  | 'SALES_REP';
+const API_URL = 'http://localhost:3000';
+
+interface Role {
+  id: number;
+  name: string;
+  isActive: boolean;
+}
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -28,8 +34,7 @@ interface CreateUserForm {
   fullName: string;
   email: string;
   password: string;
-  role: UserRole;
-  jobTitle: string;
+  roleId: number | '';
   isActive: boolean;
 }
 
@@ -37,10 +42,29 @@ const initialForm: CreateUserForm = {
   fullName: '',
   email: '',
   password: '',
-  role: 'SALES_REP',
-  jobTitle: '',
+  roleId: '',
   isActive: true,
 };
+
+async function readResponse<T>(
+  response: Response,
+): Promise<T> {
+  const data = await response
+    .json()
+    .catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      Array.isArray(data?.message)
+        ? data.message.join(' ')
+        : data?.message ??
+          `İstek başarısız oldu. HTTP ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
 
 export default function CreateUserDialog({
   open,
@@ -48,115 +72,162 @@ export default function CreateUserDialog({
   onCreated,
 }: CreateUserDialogProps) {
   const [form, setForm] =
-    useState<CreateUserForm>(initialForm);
+    React.useState<CreateUserForm>(
+      initialForm,
+    );
 
-  const [loading, setLoading] = useState(false);
+  const [roles, setRoles] =
+    React.useState<Role[]>([]);
+
+  const [loadingRoles, setLoadingRoles] =
+    React.useState(false);
+
+  const [saving, setSaving] =
+    React.useState(false);
+
   const [error, setError] =
-    useState<string | null>(null);
+    React.useState('');
 
-  const handleChange = (
-    field: keyof CreateUserForm,
-    value: string | boolean,
-  ) => {
-    setForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
+  const loadRoles =
+    React.useCallback(async () => {
+      try {
+        setLoadingRoles(true);
+        setError('');
 
-  const handleDialogClose = () => {
-    if (loading) {
+        const response = await fetch(
+          `${API_URL}/roles`,
+        );
+
+        const data =
+          await readResponse<Role[]>(
+            response,
+          );
+
+        const activeRoles =
+          data.filter(
+            (role) => role.isActive,
+          );
+
+        setRoles(activeRoles);
+
+        setForm((current) => ({
+          ...current,
+          roleId:
+            activeRoles[0]?.id ?? '',
+        }));
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Roller yüklenemedi.',
+        );
+      } finally {
+        setLoadingRoles(false);
+      }
+    }, []);
+
+  React.useEffect(() => {
+    if (!open) {
       return;
     }
 
     setForm(initialForm);
-    setError(null);
-    onClose();
-  };
+    setError('');
+
+    void loadRoles();
+  }, [open, loadRoles]);
 
   const handleSubmit = async () => {
-    setError(null);
+    const fullName =
+      form.fullName.trim();
 
-    if (!form.fullName.trim()) {
-      setError('Ad soyad alanı zorunludur.');
+    const email = form.email
+      .trim()
+      .toLowerCase();
+
+    if (!fullName) {
+      setError(
+        'Ad soyad alanı zorunludur.',
+      );
       return;
     }
 
-    if (!form.email.trim()) {
-      setError('E-posta alanı zorunludur.');
+    if (!email) {
+      setError(
+        'E-posta alanı zorunludur.',
+      );
       return;
     }
 
-    if (!form.password.trim()) {
-      setError('Şifre alanı zorunludur.');
+    if (form.password.length < 6) {
+      setError(
+        'Şifre en az 6 karakter olmalıdır.',
+      );
+      return;
+    }
+
+    if (form.roleId === '') {
+      setError('Rol seçilmelidir.');
       return;
     }
 
     try {
-      setLoading(true);
+      setSaving(true);
+      setError('');
 
       const token =
-        localStorage.getItem('accessToken') ??
-        sessionStorage.getItem('accessToken');
+        localStorage.getItem(
+          'accessToken',
+        ) ??
+        sessionStorage.getItem(
+          'accessToken',
+        );
 
       const response = await fetch(
-        'http://localhost:3000/users',
+        `${API_URL}/users`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type':
+              'application/json',
             ...(token
               ? {
-                  Authorization: `Bearer ${token}`,
+                  Authorization:
+                    `Bearer ${token}`,
                 }
               : {}),
           },
           body: JSON.stringify({
-            fullName: form.fullName.trim(),
-            email: form.email.trim(),
+            fullName,
+            email,
             password: form.password,
-            role: form.role,
-            jobTitle:
-              form.jobTitle.trim() || undefined,
+            roleId: form.roleId,
             isActive: form.isActive,
           }),
         },
       );
 
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        const message = Array.isArray(
-          responseData.message,
-        )
-          ? responseData.message.join(', ')
-          : responseData.message;
-
-        throw new Error(
-          message ?? 'Kullanıcı oluşturulamadı.',
-        );
-      }
-
-      setForm(initialForm);
-      setError(null);
+      await readResponse(response);
 
       onCreated();
       onClose();
-    } catch (requestError) {
+    } catch (submitError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Beklenmeyen bir hata oluştu.',
+        submitError instanceof Error
+          ? submitError.message
+          : 'Kullanıcı oluşturulamadı.',
       );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   return (
     <Dialog
       open={open}
-      onClose={handleDialogClose}
+      onClose={
+        saving ? undefined : onClose
+      }
       fullWidth
       maxWidth="sm"
     >
@@ -178,126 +249,163 @@ export default function CreateUserDialog({
           <TextField
             label="Ad Soyad"
             value={form.fullName}
-            onChange={(event) =>
-              handleChange(
-                'fullName',
-                event.target.value,
-              )
-            }
-            fullWidth
+            disabled={saving}
             required
-            autoFocus
+            fullWidth
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                fullName:
+                  event.target.value,
+              }))
+            }
           />
 
           <TextField
             label="E-posta"
             type="email"
             value={form.email}
-            onChange={(event) =>
-              handleChange(
-                'email',
-                event.target.value,
-              )
-            }
-            fullWidth
+            disabled={saving}
             required
+            fullWidth
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                email:
+                  event.target.value,
+              }))
+            }
           />
 
           <TextField
             label="Şifre"
             type="password"
             value={form.password}
+            disabled={saving}
+            required
+            fullWidth
             onChange={(event) =>
-              handleChange(
-                'password',
-                event.target.value,
-              )
+              setForm((current) => ({
+                ...current,
+                password:
+                  event.target.value,
+              }))
             }
+          />
+
+          <FormControl
             fullWidth
             required
-          />
-
-          <TextField
-            label="Rol"
-            select
-            value={form.role}
-            onChange={(event) =>
-              handleChange(
-                'role',
-                event.target.value as UserRole,
-              )
+            disabled={
+              saving || loadingRoles
             }
-            fullWidth
           >
-            <MenuItem value="ADMIN">
-              Admin
-            </MenuItem>
+            <InputLabel id="role-label">
+              Rol
+            </InputLabel>
 
-            <MenuItem value="SALES_MANAGER">
-              Satış Müdürü
-            </MenuItem>
+            <Select
+              labelId="role-label"
+              label="Rol"
+              value={form.roleId}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  roleId:
+                    Number(
+                      event.target.value,
+                    ),
+                }))
+              }
+            >
+              {roles.map((role) => (
+                <MenuItem
+                  key={role.id}
+                  value={role.id}
+                >
+                  {role.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-            <MenuItem value="SALES_REP">
-              Satış Temsilcisi
-            </MenuItem>
-          </TextField>
-
-          <TextField
-            label="Ünvan"
-            value={form.jobTitle}
-            onChange={(event) =>
-              handleChange(
-                'jobTitle',
-                event.target.value,
-              )
-            }
-            fullWidth
-          />
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={form.isActive}
-                onChange={(event) =>
-                  handleChange(
-                    'isActive',
-                    event.target.checked,
-                  )
-                }
+          {loadingRoles && (
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                alignItems: 'center',
+              }}
+            >
+              <CircularProgress
+                size={18}
               />
-            }
-            label={
-              form.isActive
-                ? 'Aktif kullanıcı'
-                : 'Pasif kullanıcı'
-            }
-          />
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Roller yükleniyor...
+              </Typography>
+            </Stack>
+          )}
+
+          {!loadingRoles &&
+            roles.length === 0 && (
+              <Alert severity="warning">
+                Aktif rol bulunamadı.
+                Önce Rol Tanımlama
+                sayfasından rol oluşturun.
+              </Alert>
+            )}
+
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: 'center',
+              justifyContent:
+                'space-between',
+            }}
+          >
+            <Typography>
+              Aktif kullanıcı
+            </Typography>
+
+            <Switch
+              checked={form.isActive}
+              disabled={saving}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  isActive:
+                    event.target.checked,
+                }))
+              }
+            />
+          </Stack>
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2 }}>
+      <DialogActions>
         <Button
-          onClick={handleDialogClose}
-          disabled={loading}
+          onClick={onClose}
+          disabled={saving}
         >
           İptal
         </Button>
 
         <Button
           variant="contained"
-          onClick={handleSubmit}
-          disabled={loading}
-          startIcon={
-            loading ? (
-              <CircularProgress
-                size={18}
-                color="inherit"
-              />
-            ) : undefined
+          disabled={
+            saving ||
+            loadingRoles ||
+            roles.length === 0
+          }
+          onClick={() =>
+            void handleSubmit()
           }
         >
-          {loading
-            ? 'Kaydediliyor'
+          {saving
+            ? 'Kaydediliyor...'
             : 'Kaydet'}
         </Button>
       </DialogActions>

@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
+import { Permission } from '../permission/permission.entity';
 import { User} from './users.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -19,6 +20,9 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Permission)
+    private readonly permissionRepository: Repository<Permission>,
+    
   ) {}
 
   async create(
@@ -46,24 +50,61 @@ export class UsersService {
       12,
     );
 
-    let role: Role | undefined;
+    const userCount = await this.userRepository.count();
 
-    if (dto.roleId !== undefined) {
-     const foundRole =
+    const isFirstUser = userCount === 0;
+
+   let role: Role | undefined;
+
+if (isFirstUser) {
+  const permissions =
+    await this.permissionRepository.find();
+
+  let adminRole =
+    await this.roleRepository.findOne({
+      where: {
+        name: 'Sistem Yöneticisi',
+      },
+      relations: {
+        permissions: true,
+      },
+    });
+
+  if (!adminRole) {
+    adminRole =
+      this.roleRepository.create({
+        name: 'Sistem Yöneticisi',
+        isActive: true,
+        permissions,
+      });
+  } else {
+    adminRole.permissions = permissions;
+  }
+
+  adminRole =
+    await this.roleRepository.save(adminRole);
+
+  role = adminRole;
+  } else {
+  if (dto.roleId === undefined) {
+    throw new NotFoundException(
+      'Rol seçilmelidir.',
+    );
+  }
+
+  const foundRole =
     await this.roleRepository.findOneBy({
       id: dto.roleId,
     });
 
-    
-
-     if (!foundRole) {
+  if (!foundRole) {
     throw new NotFoundException(
       'Rol bulunamadı.',
-     );
-    }
+    );
+  }
 
-     role = foundRole;
-    }
+    role = foundRole;
+  }
 
 
     const user = this.userRepository.create({
@@ -107,14 +148,19 @@ export class UsersService {
   }
 
   async findByEmail(
-    email: string,
+  email: string,
   ): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: {
-        email: email
-          .trim()
-          .toLocaleLowerCase('tr-TR'),
+  return this.userRepository.findOne({
+    where: {
+      email: email
+        .trim()
+        .toLocaleLowerCase('tr-TR'),
+    },
+    relations: {
+      role: {
+        permissions: true,
       },
+    },
     });
   }
 

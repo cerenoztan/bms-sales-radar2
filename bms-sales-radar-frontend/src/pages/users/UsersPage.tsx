@@ -18,16 +18,19 @@ import CreateUserDialog from './CreateUserDialog';
 
 const API_URL = 'http://localhost:3000';
 
-type UserRole =
-  | 'ADMIN'
-  | 'SALES_MANAGER'
-  | 'SALES_REP';
+interface Role {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 interface UserRow {
   id: number;
   fullName: string;
   email: string;
-  role: UserRole;
+  role?: Role | null;
   jobTitle?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -40,36 +43,31 @@ interface SnackbarState {
   severity: 'success' | 'error';
 }
 
-function getRoleLabel(role: UserRole): string {
-  switch (role) {
-    case 'ADMIN':
-      return 'Yönetici';
-
-    case 'SALES_MANAGER':
-      return 'Satış Müdürü';
-
-    case 'SALES_REP':
-      return 'Satış Temsilcisi';
-
-    default:
-      return role;
-  }
-}
-
 function formatDate(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
   return new Intl.DateTimeFormat('tr-TR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export default function UsersPage() {
-  const [rows, setRows] = React.useState<UserRow[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [rows, setRows] =
+    React.useState<UserRow[]>([]);
 
-  const [createDialogOpen, setCreateDialogOpen] =
-    React.useState(false);
+  const [loading, setLoading] =
+    React.useState(true);
+
+  const [
+    createDialogOpen,
+    setCreateDialogOpen,
+  ] = React.useState(false);
 
   const [snackbar, setSnackbar] =
     React.useState<SnackbarState>({
@@ -78,59 +76,78 @@ export default function UsersPage() {
       severity: 'success',
     });
 
-  const loadUsers = React.useCallback(async () => {
-    try {
-      setLoading(true);
+  const loadUsers =
+    React.useCallback(async () => {
+      try {
+        setLoading(true);
 
-      const token =
-        localStorage.getItem('accessToken') ??
-        sessionStorage.getItem('accessToken');
+        const token =
+          localStorage.getItem(
+            'accessToken',
+          ) ??
+          sessionStorage.getItem(
+            'accessToken',
+          );
 
-      const response = await fetch(`${API_URL}/users`, {
-        headers: {
-          ...(token
-            ? {
-                Authorization: `Bearer ${token}`,
-              }
-            : {}),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Kullanıcılar alınamadı. HTTP ${response.status}`,
+        const response = await fetch(
+          `${API_URL}/users`,
+          {
+            headers: {
+              ...(token
+                ? {
+                    Authorization:
+                      `Bearer ${token}`,
+                  }
+                : {}),
+            },
+          },
         );
+
+        if (!response.ok) {
+          const data = await response
+            .json()
+            .catch(() => null);
+
+          const message =
+            Array.isArray(data?.message)
+              ? data.message.join(' ')
+              : data?.message ??
+                `Kullanıcılar alınamadı. HTTP ${response.status}`;
+
+          throw new Error(message);
+        }
+
+        const data =
+          (await response.json()) as UserRow[];
+
+        setRows(data);
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Kullanıcılar yüklenirken hata oluştu.',
+          severity: 'error',
+        });
+      } finally {
+        setLoading(false);
       }
-
-      const data: UserRow[] = await response.json();
-
-      setRows(data);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Kullanıcılar yüklenirken hata oluştu.';
-
-      setSnackbar({
-        open: true,
-        message,
-        severity: 'error',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }, []);
 
   React.useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
 
   const handleUserCreated = async () => {
+    setCreateDialogOpen(false);
+
     await loadUsers();
 
     setSnackbar({
       open: true,
-      message: 'Kullanıcı başarıyla oluşturuldu.',
+      message:
+        'Kullanıcı başarıyla oluşturuldu.',
       severity: 'success',
     });
   };
@@ -151,29 +168,46 @@ export default function UsersPage() {
     {
       field: 'role',
       headerName: 'Rol',
-      minWidth: 170,
+      minWidth: 180,
       flex: 1,
-      renderCell: (params) => (
-        <Chip
-          label={getRoleLabel(params.value)}
-          size="small"
-          variant="outlined"
-        />
-      ),
+      sortable: false,
+      renderCell: (params) => {
+        const role =
+          params.row.role ?? null;
+
+        return (
+          <Chip
+            label={
+              role?.name ??
+              'Rol atanmadı'
+            }
+            color={
+              role?.isActive
+                ? 'primary'
+                : 'default'
+            }
+            size="small"
+            variant="outlined"
+          />
+        );
+      },
     },
     {
       field: 'jobTitle',
       headerName: 'Görev',
       flex: 1.3,
-      minWidth: 220,
-      valueFormatter: (value) => value ?? '-',
+      minWidth: 200,
+      valueFormatter: (value) =>
+        value ?? '-',
     },
     {
       field: 'createdAt',
       headerName: 'Katılma Tarihi',
       minWidth: 150,
       valueFormatter: (value) =>
-        value ? formatDate(value) : '-',
+        value
+          ? formatDate(String(value))
+          : '-',
     },
     {
       field: 'isActive',
@@ -181,8 +215,16 @@ export default function UsersPage() {
       minWidth: 110,
       renderCell: (params) => (
         <Chip
-          label={params.value ? 'Aktif' : 'Pasif'}
-          color={params.value ? 'success' : 'default'}
+          label={
+            params.row.isActive
+              ? 'Aktif'
+              : 'Pasif'
+          }
+          color={
+            params.row.isActive
+              ? 'success'
+              : 'default'
+          }
           size="small"
           variant="outlined"
         />
@@ -200,7 +242,8 @@ export default function UsersPage() {
         spacing={2}
         sx={{
           mb: 3,
-          justifyContent: 'space-between',
+          justifyContent:
+            'space-between',
           alignItems: {
             xs: 'flex-start',
             sm: 'center',
@@ -216,15 +259,21 @@ export default function UsersPage() {
             Kullanıcılar
           </Typography>
 
-          <Typography sx={{ color: 'text.secondary' }}>
+          <Typography
+            color="text.secondary"
+          >
             Sisteme kayıtlı ekip üyeleri
           </Typography>
         </Box>
 
         <Button
           variant="contained"
-          startIcon={<PersonAddOutlinedIcon />}
-          onClick={() => setCreateDialogOpen(true)}
+          startIcon={
+            <PersonAddOutlinedIcon />
+          }
+          onClick={() =>
+            setCreateDialogOpen(true)
+          }
         >
           Yeni Kullanıcı
         </Button>
@@ -234,7 +283,8 @@ export default function UsersPage() {
         variant="outlined"
         sx={{
           width: '100%',
-          height: 'calc(100vh - 180px)',
+          height:
+            'calc(100vh - 180px)',
           minHeight: 480,
           overflow: 'hidden',
           borderRadius: 3,
@@ -244,7 +294,11 @@ export default function UsersPage() {
           rows={rows}
           columns={columns}
           loading={loading}
-          pageSizeOptions={[10, 25, 50]}
+          pageSizeOptions={[
+            10,
+            25,
+            50,
+          ]}
           initialState={{
             pagination: {
               paginationModel: {
@@ -253,25 +307,25 @@ export default function UsersPage() {
               },
             },
           }}
+          disableRowSelectionOnClick
           sx={{
             border: 0,
             height: '100%',
 
-            '& .MuiDataGrid-columnHeaders': {
-              bgcolor: 'grey.50',
-            },
+            '& .MuiDataGrid-columnHeaders':
+              {
+                bgcolor: 'grey.50',
+              },
 
-            '& .MuiDataGrid-cell:focus': {
-              outline: 'none',
-            },
+            '& .MuiDataGrid-cell:focus':
+              {
+                outline: 'none',
+              },
 
-            '& .MuiDataGrid-columnHeader:focus': {
-              outline: 'none',
-            },
-
-            '& .MuiDataGrid-row': {
-              cursor: 'pointer',
-            },
+            '& .MuiDataGrid-columnHeader:focus':
+              {
+                outline: 'none',
+              },
           }}
         />
       </Paper>
@@ -280,20 +334,26 @@ export default function UsersPage() {
         open={snackbar.open}
         autoHideDuration={4000}
         onClose={() =>
-          setSnackbar((current) => ({
-            ...current,
-            open: false,
-          }))
+          setSnackbar(
+            (current) => ({
+              ...current,
+              open: false,
+            }),
+          )
         }
       >
         <Alert
-          severity={snackbar.severity}
+          severity={
+            snackbar.severity
+          }
           variant="filled"
           onClose={() =>
-            setSnackbar((current) => ({
-              ...current,
-              open: false,
-            }))
+            setSnackbar(
+              (current) => ({
+                ...current,
+                open: false,
+              }),
+            )
           }
         >
           {snackbar.message}
@@ -302,7 +362,9 @@ export default function UsersPage() {
 
       <CreateUserDialog
         open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
+        onClose={() =>
+          setCreateDialogOpen(false)
+        }
         onCreated={() => {
           void handleUserCreated();
         }}

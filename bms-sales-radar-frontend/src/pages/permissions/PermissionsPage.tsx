@@ -17,6 +17,7 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import List from '@mui/material/List';
@@ -28,21 +29,18 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 
-type RoleCode =
-  | 'ADMIN'
-  | 'SALES_MANAGER'
-  | 'SALES_REP';
+const API_URL = 'http://localhost:3000';
 
 interface Role {
   id: number;
   name: string;
-  code: RoleCode;
-  description: string;
+  isActive: boolean;
 }
 
 interface Permission {
-  code: string;
-  label: string;
+  id: number;
+  name: string;
+  key: string;
 }
 
 interface PermissionGroup {
@@ -52,336 +50,506 @@ interface PermissionGroup {
   permissions: Permission[];
 }
 
-type RolePermissions = Record<RoleCode, string[]>;
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error';
+}
 
-const roles: Role[] = [
-  {
-    id: 1,
-    name: 'Yönetici',
-    code: 'ADMIN',
-    description: 'Sistemdeki tüm işlemlere erişebilir.',
-  },
-  {
-    id: 2,
-    name: 'Satış Müdürü',
-    code: 'SALES_MANAGER',
-    description:
-      'Satış ekibini, işletmeleri ve raporları yönetebilir.',
-  },
-  {
-    id: 3,
-    name: 'Satış Temsilcisi',
-    code: 'SALES_REP',
-    description:
-      'Kendisine açık satış ve işletme kayıtlarını görüntüler.',
-  },
-];
+async function readResponse<T>(
+  response: Response,
+): Promise<T> {
+  const data = await response
+    .json()
+    .catch(() => null);
 
-const permissionGroups: PermissionGroup[] = [
-  {
-    module: 'Dashboard',
-    description: 'Ana gösterge paneli erişimi',
-    icon: <DashboardOutlinedIcon />,
-    permissions: [
-      {
-        code: 'DASHBOARD_VIEW',
-        label: 'Dashboard görüntüleme',
-      },
-    ],
-  },
-  {
-    module: 'İşletmeler',
-    description: 'İşletme kayıtlarını yönetme izinleri',
-    icon: <BusinessOutlinedIcon />,
-    permissions: [
-      {
-        code: 'BUSINESS_VIEW',
-        label: 'İşletmeleri görüntüleme',
-      },
-      {
-        code: 'BUSINESS_CREATE',
-        label: 'Yeni işletme oluşturma',
-      },
-      {
-        code: 'BUSINESS_UPDATE',
-        label: 'İşletme güncelleme',
-      },
-      {
-        code: 'BUSINESS_DELETE',
-        label: 'İşletme silme',
-      },
-    ],
-  },
-  {
-    module: 'Kaynaklar',
-    description: 'Kaynak URL ve kayıt yönetimi',
-    icon: <SourceOutlinedIcon />,
-    permissions: [
-      {
-        code: 'SOURCE_VIEW',
-        label: 'Kaynakları görüntüleme',
-      },
-      {
-        code: 'SOURCE_CREATE',
-        label: 'Kaynak oluşturma',
-      },
-      {
-        code: 'SOURCE_UPDATE',
-        label: 'Kaynak güncelleme',
-      },
-      {
-        code: 'SOURCE_DELETE',
-        label: 'Kaynak silme',
-      },
-    ],
-  },
-  {
-    module: 'Crawler',
-    description: 'Tarama işlemleri ve sonuçları',
-    icon: <RadarOutlinedIcon />,
-    permissions: [
-      {
-        code: 'CRAWLER_VIEW',
-        label: 'Crawler sonuçlarını görüntüleme',
-      },
-      {
-        code: 'CRAWLER_RUN',
-        label: 'Crawler çalıştırma',
-      },
-    ],
-  },
-  {
-    module: 'Raporlar',
-    description: 'Rapor görüntüleme ve dışa aktarma',
-    icon: <AssessmentOutlinedIcon />,
-    permissions: [
-      {
-        code: 'REPORT_VIEW',
-        label: 'Raporları görüntüleme',
-      },
-      {
-        code: 'REPORT_EXPORT_EXCEL',
-        label: 'Excel raporu indirme',
-      },
-      {
-        code: 'REPORT_EXPORT_PDF',
-        label: 'PDF raporu indirme',
-      },
-    ],
-  },
-  {
-    module: 'Kullanıcılar',
-    description: 'Kullanıcı hesaplarını yönetme',
-    icon: <PeopleAltOutlinedIcon />,
-    permissions: [
-      {
-        code: 'USER_VIEW',
-        label: 'Kullanıcıları görüntüleme',
-      },
-      {
-        code: 'USER_CREATE',
-        label: 'Kullanıcı oluşturma',
-      },
-      {
-        code: 'USER_UPDATE',
-        label: 'Kullanıcı güncelleme',
-      },
-      {
-        code: 'USER_DELETE',
-        label: 'Kullanıcı silme',
-      },
-    ],
-  },
-  {
-    module: 'Roller',
-    description: 'Rol tanımlama işlemleri',
-    icon: <ManageAccountsOutlinedIcon />,
-    permissions: [
-      {
-        code: 'ROLE_VIEW',
-        label: 'Rolleri görüntüleme',
-      },
-      {
-        code: 'ROLE_CREATE',
-        label: 'Rol oluşturma',
-      },
-      {
-        code: 'ROLE_UPDATE',
-        label: 'Rol güncelleme',
-      },
-      {
-        code: 'ROLE_DELETE',
-        label: 'Rol silme',
-      },
-    ],
-  },
-  {
-    module: 'Yetkilendirme',
-    description: 'Rol izinlerini düzenleme',
+  if (!response.ok) {
+    const message =
+      Array.isArray(data?.message)
+        ? data.message.join(' ')
+        : data?.message ??
+          `İstek başarısız oldu. HTTP ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+function getGroupDefinition(
+  permissionKey: string,
+): {
+  module: string;
+  description: string;
+  icon: React.ReactNode;
+} {
+  if (permissionKey.startsWith('DASHBOARD_')) {
+    return {
+      module: 'Dashboard',
+      description: 'Ana gösterge paneli erişimi',
+      icon: <DashboardOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('BUSINESS_')) {
+    return {
+      module: 'İşletmeler',
+      description: 'İşletme kayıtlarını yönetme izinleri',
+      icon: <BusinessOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('SOURCE_')) {
+    return {
+      module: 'Kaynaklar',
+      description: 'Kaynak URL ve kayıt yönetimi',
+      icon: <SourceOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('CRAWLER_')) {
+    return {
+      module: 'Crawler',
+      description: 'Tarama işlemleri ve sonuçları',
+      icon: <RadarOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('REPORT_')) {
+    return {
+      module: 'Raporlar',
+      description: 'Rapor görüntüleme ve dışa aktarma',
+      icon: <AssessmentOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('USER_')) {
+    return {
+      module: 'Kullanıcılar',
+      description: 'Kullanıcı hesaplarını yönetme',
+      icon: <PeopleAltOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('ROLE_')) {
+    return {
+      module: 'Roller',
+      description: 'Rol tanımlama işlemleri',
+      icon: <ManageAccountsOutlinedIcon />,
+    };
+  }
+
+  if (permissionKey.startsWith('PERMISSION_')) {
+    return {
+      module: 'Yetkilendirme',
+      description: 'Rol izinlerini düzenleme',
+      icon: <AdminPanelSettingsOutlinedIcon />,
+    };
+  }
+
+  return {
+    module: 'Diğer',
+    description: 'Diğer sistem izinleri',
     icon: <AdminPanelSettingsOutlinedIcon />,
-    permissions: [
-      {
-        code: 'PERMISSION_VIEW',
-        label: 'Yetkilendirmeyi görüntüleme',
-      },
-      {
-        code: 'PERMISSION_UPDATE',
-        label: 'Yetkilendirmeyi güncelleme',
-      },
-    ],
-  },
-];
+  };
+}
 
-const allPermissionCodes =
-  permissionGroups.flatMap((group) =>
-    group.permissions.map(
-      (permission) => permission.code,
-    ),
-  );
+function groupPermissions(
+  permissions: Permission[],
+): PermissionGroup[] {
+  const groups = new Map<
+    string,
+    PermissionGroup
+  >();
 
-const initialRolePermissions: RolePermissions = {
-  ADMIN: allPermissionCodes,
-  SALES_MANAGER: [
-    'DASHBOARD_VIEW',
+  for (const permission of permissions) {
+    const definition =
+      getGroupDefinition(permission.key);
 
-    'BUSINESS_VIEW',
-    'BUSINESS_CREATE',
-    'BUSINESS_UPDATE',
+    const existing =
+      groups.get(definition.module);
 
-    'SOURCE_VIEW',
-    'SOURCE_CREATE',
-    'SOURCE_UPDATE',
+    if (existing) {
+      existing.permissions.push(permission);
+      continue;
+    }
 
-    'CRAWLER_VIEW',
-    'CRAWLER_RUN',
+    groups.set(definition.module, {
+      ...definition,
+      permissions: [permission],
+    });
+  }
 
-    'REPORT_VIEW',
-    'REPORT_EXPORT_EXCEL',
-    'REPORT_EXPORT_PDF',
-
-    'USER_VIEW',
-
-    'ROLE_VIEW',
-  ],
-  SALES_REP: [
-    'DASHBOARD_VIEW',
-    'BUSINESS_VIEW',
-    'SOURCE_VIEW',
-    'REPORT_VIEW',
-  ],
-};
+  return Array.from(groups.values());
+}
 
 export default function PermissionsPage() {
-  const [selectedRoleCode, setSelectedRoleCode] =
-    React.useState<RoleCode>('ADMIN');
+  const [roles, setRoles] =
+    React.useState<Role[]>([]);
 
-  const [savedPermissions, setSavedPermissions] =
-    React.useState<RolePermissions>(
-      initialRolePermissions,
-    );
+  const [permissions, setPermissions] =
+    React.useState<Permission[]>([]);
 
-  const [draftPermissions, setDraftPermissions] =
-    React.useState<string[]>(
-      initialRolePermissions.ADMIN,
-    );
+  const [
+    selectedRoleId,
+    setSelectedRoleId,
+  ] = React.useState<number | null>(null);
 
-  const [snackbarOpen, setSnackbarOpen] =
+  const [
+    savedPermissionIds,
+    setSavedPermissionIds,
+  ] = React.useState<number[]>([]);
+
+  const [
+    draftPermissionIds,
+    setDraftPermissionIds,
+  ] = React.useState<number[]>([]);
+
+  const [loading, setLoading] =
+    React.useState(true);
+
+  const [
+    rolePermissionsLoading,
+    setRolePermissionsLoading,
+  ] = React.useState(false);
+
+  const [saving, setSaving] =
     React.useState(false);
+
+  const [seeding, setSeeding] =
+    React.useState(false);
+
+  const [pageError, setPageError] =
+    React.useState('');
+
+  const [snackbar, setSnackbar] =
+    React.useState<SnackbarState>({
+      open: false,
+      message: '',
+      severity: 'success',
+    });
+
+  const permissionGroups =
+    React.useMemo(
+      () => groupPermissions(permissions),
+      [permissions],
+    );
 
   const selectedRole =
     roles.find(
-      (role) => role.code === selectedRoleCode,
-    ) ?? roles[0];
-
-  const isAdmin =
-    selectedRoleCode === 'ADMIN';
+      (role) => role.id === selectedRoleId,
+    ) ?? null;
 
   const hasChanges =
     JSON.stringify(
-      [...draftPermissions].sort(),
+      [...draftPermissionIds].sort(
+        (a, b) => a - b,
+      ),
     ) !==
     JSON.stringify(
-      [
-        ...savedPermissions[
-          selectedRoleCode
-        ],
-      ].sort(),
+      [...savedPermissionIds].sort(
+        (a, b) => a - b,
+      ),
     );
 
-  const handleRoleSelect = (
-    roleCode: RoleCode,
-  ) => {
-    setSelectedRoleCode(roleCode);
-    setDraftPermissions(
-      savedPermissions[roleCode],
-    );
-  };
+  const loadInitialData =
+    React.useCallback(async () => {
+      try {
+        setLoading(true);
+        setPageError('');
 
-  const handlePermissionChange = (
-    permissionCode: string,
-  ) => {
-    if (isAdmin) {
+        const [
+          rolesResponse,
+          permissionsResponse,
+        ] = await Promise.all([
+          fetch(`${API_URL}/roles`),
+          fetch(`${API_URL}/permissions`),
+        ]);
+
+        const loadedRoles =
+          await readResponse<Role[]>(
+            rolesResponse,
+          );
+
+        const loadedPermissions =
+          await readResponse<Permission[]>(
+            permissionsResponse,
+          );
+
+        setRoles(loadedRoles);
+        setPermissions(
+          loadedPermissions,
+        );
+
+        setSelectedRoleId((current) => {
+          if (
+            current !== null &&
+            loadedRoles.some(
+              (role) =>
+                role.id === current,
+            )
+          ) {
+            return current;
+          }
+
+          return (
+            loadedRoles[0]?.id ?? null
+          );
+        });
+      } catch (error) {
+        setPageError(
+          error instanceof Error
+            ? error.message
+            : 'Yetkilendirme verileri yüklenemedi.',
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  const loadRolePermissions =
+    React.useCallback(
+      async (roleId: number) => {
+        try {
+          setRolePermissionsLoading(true);
+          setPageError('');
+
+          const response = await fetch(
+            `${API_URL}/roles/${roleId}/permissions`,
+          );
+
+          const rolePermissions =
+            await readResponse<Permission[]>(
+              response,
+            );
+
+          const permissionIds =
+            rolePermissions.map(
+              (permission) =>
+                permission.id,
+            );
+
+          setSavedPermissionIds(
+            permissionIds,
+          );
+
+          setDraftPermissionIds(
+            permissionIds,
+          );
+        } catch (error) {
+          setPageError(
+            error instanceof Error
+              ? error.message
+              : 'Rol yetkileri yüklenemedi.',
+          );
+        } finally {
+          setRolePermissionsLoading(
+            false,
+          );
+        }
+      },
+      [],
+    );
+
+  React.useEffect(() => {
+    void loadInitialData();
+  }, [loadInitialData]);
+
+  React.useEffect(() => {
+    if (selectedRoleId === null) {
+      setSavedPermissionIds([]);
+      setDraftPermissionIds([]);
       return;
     }
 
-    setDraftPermissions((current) => {
-      const exists =
-        current.includes(permissionCode);
+    void loadRolePermissions(
+      selectedRoleId,
+    );
+  }, [
+    selectedRoleId,
+    loadRolePermissions,
+  ]);
 
-      if (exists) {
-        return current.filter(
-          (code) => code !== permissionCode,
-        );
-      }
+  const handleRoleSelect = (
+    roleId: number,
+  ) => {
+    if (
+      saving ||
+      rolePermissionsLoading
+    ) {
+      return;
+    }
 
-      return [...current, permissionCode];
-    });
+    setSelectedRoleId(roleId);
+  };
+
+  const handlePermissionChange = (
+    permissionId: number,
+  ) => {
+    setDraftPermissionIds(
+      (current) => {
+        const exists =
+          current.includes(
+            permissionId,
+          );
+
+        if (exists) {
+          return current.filter(
+            (id) =>
+              id !== permissionId,
+          );
+        }
+
+        return [
+          ...current,
+          permissionId,
+        ];
+      },
+    );
   };
 
   const handleGroupChange = (
     group: PermissionGroup,
     checked: boolean,
   ) => {
-    if (isAdmin) {
-      return;
-    }
-
-    const groupCodes =
+    const groupPermissionIds =
       group.permissions.map(
-        (permission) => permission.code,
+        (permission) =>
+          permission.id,
       );
 
-    setDraftPermissions((current) => {
-      if (checked) {
-        return Array.from(
-          new Set([
-            ...current,
-            ...groupCodes,
-          ]),
+    setDraftPermissionIds(
+      (current) => {
+        if (checked) {
+          return Array.from(
+            new Set([
+              ...current,
+              ...groupPermissionIds,
+            ]),
+          );
+        }
+
+        return current.filter(
+          (id) =>
+            !groupPermissionIds.includes(
+              id,
+            ),
         );
-      }
-
-      return current.filter(
-        (code) =>
-          !groupCodes.includes(code),
-      );
-    });
-  };
-
-  const handleSave = () => {
-    setSavedPermissions((current) => ({
-      ...current,
-      [selectedRoleCode]: draftPermissions,
-    }));
-
-    setSnackbarOpen(true);
+      },
+    );
   };
 
   const handleReset = () => {
-    setDraftPermissions(
-      savedPermissions[selectedRoleCode],
+    setDraftPermissionIds(
+      savedPermissionIds,
     );
   };
+
+  const handleSave = async () => {
+    if (selectedRoleId === null) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const response = await fetch(
+        `${API_URL}/roles/${selectedRoleId}/permissions`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            permissionIds:
+              draftPermissionIds,
+          }),
+        },
+      );
+
+      await readResponse<Role>(
+        response,
+      );
+
+      setSavedPermissionIds(
+        draftPermissionIds,
+      );
+
+      setSnackbar({
+        open: true,
+        message:
+          `${selectedRole?.name ?? 'Rol'} yetkileri kaydedildi.`,
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Yetkiler kaydedilemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSeedPermissions =
+    async () => {
+      try {
+        setSeeding(true);
+
+        const response = await fetch(
+          `${API_URL}/permissions/seed`,
+          {
+            method: 'POST',
+          },
+        );
+
+        const seededPermissions =
+          await readResponse<
+            Permission[]
+          >(response);
+
+        setPermissions(
+          seededPermissions,
+        );
+
+        setSnackbar({
+          open: true,
+          message:
+            'Yetki seçenekleri oluşturuldu.',
+          severity: 'success',
+        });
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Yetki seçenekleri oluşturulamadı.',
+          severity: 'error',
+        });
+      } finally {
+        setSeeding(false);
+      }
+    };
+
+  if (loading) {
+    return (
+      <Stack
+        sx={{
+          minHeight: 400,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <CircularProgress />
+      </Stack>
+    );
+  }
 
   return (
     <Box>
@@ -393,7 +561,8 @@ export default function PermissionsPage() {
         spacing={2}
         sx={{
           mb: 3,
-          justifyContent: 'space-between',
+          justifyContent:
+            'space-between',
           alignItems: {
             xs: 'flex-start',
             md: 'center',
@@ -404,135 +573,170 @@ export default function PermissionsPage() {
           <Typography
             component="h1"
             variant="h4"
-            sx={{ fontWeight: 700 }}
+            sx={{
+              fontWeight: 700,
+            }}
           >
             Yetkilendirme
           </Typography>
 
           <Typography
-            sx={{ color: 'text.secondary' }}
+            color="text.secondary"
           >
-            Roller için modül ve işlem izinlerini
-            yönetin.
+            Backend’de kayıtlı rollerin
+            yetkilerini yönetin.
           </Typography>
         </Box>
 
         <Stack
-          direction="row"
+          direction={{
+            xs: 'column',
+            sm: 'row',
+          }}
           spacing={1.5}
         >
+          {permissions.length === 0 && (
+            <Button
+              variant="outlined"
+              disabled={seeding}
+              onClick={() =>
+                void handleSeedPermissions()
+              }
+            >
+              {seeding
+                ? 'Oluşturuluyor...'
+                : 'Yetki Seçeneklerini Oluştur'}
+            </Button>
+          )}
+
           <Button
             variant="outlined"
             onClick={handleReset}
-            disabled={!hasChanges}
+            disabled={
+              !hasChanges || saving
+            }
           >
             Değişiklikleri Geri Al
           </Button>
 
           <Button
             variant="contained"
-            startIcon={<SaveOutlinedIcon />}
-            onClick={handleSave}
-            disabled={!hasChanges || isAdmin}
+            startIcon={
+              <SaveOutlinedIcon />
+            }
+            onClick={() =>
+              void handleSave()
+            }
+            disabled={
+              selectedRoleId === null ||
+              !hasChanges ||
+              saving ||
+              rolePermissionsLoading
+            }
           >
-            Yetkileri Kaydet
+            {saving
+              ? 'Kaydediliyor...'
+              : 'Yetkileri Kaydet'}
           </Button>
         </Stack>
       </Stack>
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            lg: '320px minmax(0, 1fr)',
-          },
-          gap: 3,
-          alignItems: 'start',
-        }}
-      >
-        <Paper
-          variant="outlined"
+      {pageError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+        >
+          {pageError}
+        </Alert>
+      )}
+
+      {roles.length === 0 ? (
+        <Alert severity="info">
+          Henüz rol tanımlanmamış.
+          Önce Rol Tanımlama sayfasından
+          bir rol oluşturun.
+        </Alert>
+      ) : (
+        <Box
           sx={{
-            borderRadius: 3,
-            overflow: 'hidden',
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              lg: '320px minmax(0, 1fr)',
+            },
+            gap: 3,
+            alignItems: 'start',
           }}
         >
-          <Box sx={{ p: 2.5 }}>
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 700 }}
-            >
-              Roller
-            </Typography>
-
-            <Typography
-              variant="body2"
-              sx={{
-                color: 'text.secondary',
-                mt: 0.5,
-              }}
-            >
-              Yetkilerini düzenlemek istediğiniz
-              rolü seçin.
-            </Typography>
-          </Box>
-
-          <Divider />
-
-          <List
-            disablePadding
-            sx={{ p: 1 }}
+          <Paper
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              overflow: 'hidden',
+            }}
           >
-            {roles.map((role) => {
-              const selected =
-                role.code ===
-                selectedRoleCode;
+            <Box sx={{ p: 2.5 }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                }}
+              >
+                Roller
+              </Typography>
 
-              return (
-                <ListItemButton
-                  key={role.code}
-                  selected={selected}
-                  onClick={() =>
-                    handleRoleSelect(
-                      role.code,
-                    )
-                  }
-                  sx={{
-                    mb: 0.75,
-                    borderRadius: 2,
-                    alignItems: 'flex-start',
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                Yetkilerini düzenlemek
+                istediğiniz rolü seçin.
+              </Typography>
+            </Box>
 
-                    '&.Mui-selected': {
-                      bgcolor:
-                        'primary.main',
-                      color:
-                        'primary.contrastText',
+            <Divider />
 
-                      '&:hover': {
+            <List
+              disablePadding
+              sx={{ p: 1 }}
+            >
+              {roles.map((role) => {
+                const selected =
+                  role.id ===
+                  selectedRoleId;
+
+                return (
+                  <ListItemButton
+                    key={role.id}
+                    selected={selected}
+                    disabled={
+                      !role.isActive
+                    }
+                    onClick={() =>
+                      handleRoleSelect(
+                        role.id,
+                      )
+                    }
+                    sx={{
+                      mb: 0.75,
+                      borderRadius: 2,
+
+                      '&.Mui-selected': {
                         bgcolor:
-                          'primary.dark',
-                      },
+                          'primary.main',
+                        color:
+                          'primary.contrastText',
 
-                      '& .MuiListItemText-secondary':
-                        {
-                          color:
-                            'rgba(255, 255, 255, 0.75)',
+                        '&:hover': {
+                          bgcolor:
+                            'primary.dark',
                         },
-                    },
-                  }}
-                >
-                  <ListItemText
-                    primary={
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                          alignItems:
-                            'center',
-                          mb: 0.5,
-                        }}
-                      >
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      primary={
                         <Typography
                           sx={{
                             fontWeight: 700,
@@ -540,323 +744,302 @@ export default function PermissionsPage() {
                         >
                           {role.name}
                         </Typography>
+                      }
+                      secondary={
+                        role.isActive
+                          ? 'Aktif rol'
+                          : 'Pasif rol'
+                      }
+                      slotProps={{
+                        secondary: {
+                          sx: selected
+                            ? {
+                                color:
+                                  'rgba(255,255,255,0.75)',
+                              }
+                            : undefined,
+                        },
+                      }}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Paper>
 
-                        <Chip
-                          label={role.code}
-                          size="small"
-                          variant={
-                            selected
-                              ? 'filled'
-                              : 'outlined'
-                          }
-                          sx={
-                            selected
-                              ? {
-                                  bgcolor:
-                                    'rgba(255,255,255,0.16)',
-                                  color:
-                                    'inherit',
-                                }
-                              : undefined
-                          }
-                        />
-                      </Stack>
-                    }
-                    secondary={
-                      role.description
-                    }
-                  />
-                </ListItemButton>
-              );
-            })}
-          </List>
-        </Paper>
-
-        <Stack spacing={2}>
-          <Card
-            variant="outlined"
-            sx={{ borderRadius: 3 }}
-          >
-            <CardContent>
-              <Stack
-                direction={{
-                  xs: 'column',
-                  sm: 'row',
-                }}
-                spacing={2}
-                sx={{
-                  justifyContent:
-                    'space-between',
-                  alignItems: {
-                    xs: 'flex-start',
-                    sm: 'center',
-                  },
-                }}
-              >
-                <Box>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{
-                      alignItems: 'center',
-                      mb: 0.75,
-                    }}
-                  >
+          <Stack spacing={2}>
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+              }}
+            >
+              <CardContent>
+                <Stack
+                  direction={{
+                    xs: 'column',
+                    sm: 'row',
+                  }}
+                  spacing={2}
+                  sx={{
+                    justifyContent:
+                      'space-between',
+                    alignItems: {
+                      xs: 'flex-start',
+                      sm: 'center',
+                    },
+                  }}
+                >
+                  <Box>
                     <Typography
                       variant="h6"
                       sx={{
                         fontWeight: 700,
                       }}
                     >
-                      {selectedRole.name}
+                      {selectedRole?.name ??
+                        'Rol seçilmedi'}
                     </Typography>
 
-                    <Chip
-                      label={
-                        selectedRole.code
-                      }
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Stack>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      Yeni roller başlangıçta
+                      sıfır yetkiye sahiptir.
+                    </Typography>
+                  </Box>
 
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color:
-                        'text.secondary',
-                    }}
-                  >
-                    {
-                      selectedRole.description
-                    }
-                  </Typography>
-                </Box>
+                  <Chip
+                    label={`${draftPermissionIds.length} yetki seçili`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Stack>
+              </CardContent>
+            </Card>
 
-                <Chip
-                  label={`${draftPermissions.length} yetki seçili`}
-                  color="primary"
-                  variant="outlined"
-                />
+            {rolePermissionsLoading ? (
+              <Stack
+                sx={{
+                  minHeight: 250,
+                  alignItems: 'center',
+                  justifyContent:
+                    'center',
+                }}
+              >
+                <CircularProgress />
               </Stack>
+            ) : permissions.length === 0 ? (
+              <Alert severity="warning">
+                Henüz yetki seçeneği
+                oluşturulmamış. Yukarıdaki
+                “Yetki Seçeneklerini Oluştur”
+                butonuna basın.
+              </Alert>
+            ) : (
+              permissionGroups.map(
+                (group) => {
+                  const groupIds =
+                    group.permissions.map(
+                      (permission) =>
+                        permission.id,
+                    );
 
-              {isAdmin && (
-                <Alert
-                  severity="info"
-                  sx={{ mt: 2 }}
-                >
-                  Yönetici rolü sistemdeki tüm
-                  yetkilere sahiptir. Bu rolün
-                  izinleri değiştirilemez.
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
+                  const selectedCount =
+                    groupIds.filter(
+                      (id) =>
+                        draftPermissionIds.includes(
+                          id,
+                        ),
+                    ).length;
 
-          {permissionGroups.map(
-            (group) => {
-              const groupCodes =
-                group.permissions.map(
-                  (permission) =>
-                    permission.code,
-                );
+                  const allSelected =
+                    selectedCount ===
+                    groupIds.length;
 
-              const selectedCount =
-                groupCodes.filter(
-                  (code) =>
-                    draftPermissions.includes(
-                      code,
-                    ),
-                ).length;
-
-              const allSelected =
-                selectedCount ===
-                groupCodes.length;
-
-              const partiallySelected =
-                selectedCount > 0 &&
-                !allSelected;
-
-              return (
-                <Card
-                  key={group.module}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 3,
-                  }}
-                >
-                  <CardContent>
-                    <Stack
-                      direction={{
-                        xs: 'column',
-                        sm: 'row',
-                      }}
-                      spacing={2}
+                  return (
+                    <Card
+                      key={group.module}
+                      variant="outlined"
                       sx={{
-                        justifyContent:
-                          'space-between',
-                        alignItems: {
-                          xs: 'flex-start',
-                          sm: 'center',
-                        },
+                        borderRadius: 3,
                       }}
                     >
-                      <Stack
-                        direction="row"
-                        spacing={1.5}
-                        sx={{
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Box
+                      <CardContent>
+                        <Stack
+                          direction={{
+                            xs: 'column',
+                            sm: 'row',
+                          }}
+                          spacing={2}
                           sx={{
-                            width: 42,
-                            height: 42,
-                            display: 'flex',
-                            alignItems:
-                              'center',
                             justifyContent:
-                              'center',
-                            borderRadius: 2,
-                            bgcolor:
-                              'primary.50',
-                            color:
-                              'primary.main',
+                              'space-between',
+                            alignItems: {
+                              xs: 'flex-start',
+                              sm: 'center',
+                            },
                           }}
                         >
-                          {group.icon}
-                        </Box>
-
-                        <Box>
-                          <Typography
-                            variant="h6"
+                          <Stack
+                            direction="row"
+                            spacing={1.5}
                             sx={{
-                              fontWeight: 700,
+                              alignItems:
+                                'center',
                             }}
                           >
-                            {group.module}
-                          </Typography>
+                            <Box
+                              sx={{
+                                width: 42,
+                                height: 42,
+                                display:
+                                  'flex',
+                                alignItems:
+                                  'center',
+                                justifyContent:
+                                  'center',
+                                borderRadius: 2,
+                                bgcolor:
+                                  'action.hover',
+                                color:
+                                  'primary.main',
+                              }}
+                            >
+                              {group.icon}
+                            </Box>
 
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              color:
-                                'text.secondary',
-                            }}
-                          >
-                            {
-                              group.description
-                            }
-                          </Typography>
-                        </Box>
-                      </Stack>
+                            <Box>
+                              <Typography
+                                variant="h6"
+                                sx={{
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {group.module}
+                              </Typography>
 
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={
-                              allSelected
-                            }
-                            disabled={isAdmin}
-                            onChange={(
-                              event,
-                            ) =>
-                              handleGroupChange(
-                                group,
-                                event.target
-                                  .checked,
-                              )
-                            }
-                            sx={{
-                              '& .MuiSwitch-switchBase.Mui-checked':
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
                                 {
-                                  color:
-                                    partiallySelected
-                                      ? 'warning.main'
-                                      : undefined,
-                                },
-                            }}
-                          />
-                        }
-                        label="Tümünü seç"
-                      />
-                    </Stack>
+                                  group.description
+                                }
+                              </Typography>
+                            </Box>
+                          </Stack>
 
-                    <Divider sx={{ my: 2 }} />
-
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: '1fr',
-                          sm: 'repeat(2, minmax(0, 1fr))',
-                        },
-                        gap: 1,
-                      }}
-                    >
-                      {group.permissions.map(
-                        (permission) => (
                           <FormControlLabel
-                            key={
-                              permission.code
-                            }
-                            disabled={
-                              isAdmin
-                            }
                             control={
-                              <Checkbox
-                                checked={draftPermissions.includes(
-                                  permission.code,
-                                )}
-                                onChange={() =>
-                                  handlePermissionChange(
-                                    permission.code,
+                              <Switch
+                                checked={
+                                  allSelected
+                                }
+                                disabled={
+                                  selectedRoleId ===
+                                  null
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  handleGroupChange(
+                                    group,
+                                    event.target
+                                      .checked,
                                   )
                                 }
                               />
                             }
-                            label={
-                              permission.label
-                            }
-                            sx={{
-                              m: 0,
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 1.5,
-
-                              '&:hover': {
-                                bgcolor:
-                                  'action.hover',
-                              },
-                            }}
+                            label="Tümünü seç"
                           />
-                        ),
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              );
-            },
-          )}
-        </Stack>
-      </Box>
+                        </Stack>
+
+                        <Divider
+                          sx={{ my: 2 }}
+                        />
+
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns:
+                              {
+                                xs: '1fr',
+                                sm: 'repeat(2, minmax(0, 1fr))',
+                              },
+                            gap: 1,
+                          }}
+                        >
+                          {group.permissions.map(
+                            (
+                              permission,
+                            ) => (
+                              <FormControlLabel
+                                key={
+                                  permission.id
+                                }
+                                control={
+                                  <Checkbox
+                                    checked={draftPermissionIds.includes(
+                                      permission.id,
+                                    )}
+                                    onChange={() =>
+                                      handlePermissionChange(
+                                        permission.id,
+                                      )
+                                    }
+                                  />
+                                }
+                                label={
+                                  permission.name
+                                }
+                                sx={{
+                                  m: 0,
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1.5,
+
+                                  '&:hover': {
+                                    bgcolor:
+                                      'action.hover',
+                                  },
+                                }}
+                              />
+                            ),
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  );
+                },
+              )
+            )}
+          </Stack>
+        </Box>
+      )}
 
       <Snackbar
-        open={snackbarOpen}
+        open={snackbar.open}
         autoHideDuration={3500}
         onClose={() =>
-          setSnackbarOpen(false)
+          setSnackbar((current) => ({
+            ...current,
+            open: false,
+          }))
         }
       >
         <Alert
-          severity="success"
+          severity={snackbar.severity}
           variant="filled"
           onClose={() =>
-            setSnackbarOpen(false)
+            setSnackbar((current) => ({
+              ...current,
+              open: false,
+            }))
           }
         >
-          {selectedRole.name} rolünün yetkileri
-          kaydedildi.
+          {snackbar.message}
         </Alert>
       </Snackbar>
     </Box>

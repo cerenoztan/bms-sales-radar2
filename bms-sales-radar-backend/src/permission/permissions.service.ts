@@ -8,7 +8,7 @@ import {
   Repository,
 } from 'typeorm';
 
-import { Permission } from './permission-entity';
+import { Permission } from './permission.entity';
 import { Role } from '../roles/role.entity';
 
 @Injectable()
@@ -52,6 +52,76 @@ export class PermissionsService {
 
     return role.permissions;
   }
+
+  async seedDefaults(): Promise<Permission[]> {
+  const defaults = [
+    {
+      name: 'Dashboard görüntüleme',
+      key: 'DASHBOARD_VIEW',
+    },
+    {
+      name: 'Kullanıcıları görüntüleme',
+      key: 'USER_VIEW',
+    },
+    {
+      name: 'Kullanıcı oluşturma',
+      key: 'USER_CREATE',
+    },
+    {
+      name: 'Kullanıcı güncelleme',
+      key: 'USER_UPDATE',
+    },
+    {
+      name: 'Kullanıcı silme',
+      key: 'USER_DELETE',
+    },
+    {
+      name: 'Rolleri görüntüleme',
+      key: 'ROLE_VIEW',
+    },
+    {
+      name: 'Rol oluşturma',
+      key: 'ROLE_CREATE',
+    },
+    {
+      name: 'Rol güncelleme',
+      key: 'ROLE_UPDATE',
+    },
+    {
+      name: 'Rol silme',
+      key: 'ROLE_DELETE',
+    },
+    {
+      name: 'Yetkilendirmeyi görüntüleme',
+      key: 'PERMISSION_VIEW',
+    },
+    {
+      name: 'Yetkilendirmeyi güncelleme',
+      key: 'PERMISSION_UPDATE',
+    },
+    {
+      name: 'Raporları görüntüleme',
+      key: 'REPORT_VIEW',
+    },
+  ];
+
+  for (const item of defaults) {
+    const existing =
+      await this.permissionRepository.findOne({
+        where: {
+          key: item.key,
+        },
+      });
+
+    if (!existing) {
+      await this.permissionRepository.save(
+        this.permissionRepository.create(item),
+      );
+    }
+  }
+
+  return this.findAll();
+ }
 
   async updateRolePermissions(
     roleId: number,

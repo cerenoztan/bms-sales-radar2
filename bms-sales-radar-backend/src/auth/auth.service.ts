@@ -49,14 +49,26 @@ export class AuthService {
     const accessToken =
       await this.jwtService.signAsync(payload);
 
-    return {
-      accessToken,
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-      },
+   return {
+  accessToken,
+  user: {
+    id: user.id,
+    fullName: user.fullName,
+    email: user.email,
+    jobTitle: user.jobTitle,
+
+    role: user.role
+      ? {
+          id: user.role.id,
+          name: user.role.name,
+        }
+      : null,
+
+    permissions:
+      user.role?.permissions?.map(
+        (permission) => permission.key,
+      ) ?? [],
+       },
     };
   }
   async forgotPassword(

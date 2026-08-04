@@ -1,10 +1,10 @@
 import {
   IsBoolean,
   IsEmail,
-  IsEnum,
   IsOptional,
   IsString,
   MinLength,
+  IsInt,
 } from 'class-validator';
 
 
@@ -22,7 +22,8 @@ export class UpdateUserDto {
   @MinLength(6)
   password?: string;
 
-
+  @IsOptional()
+  @IsInt()
   roleId?: number;
 
   @IsOptional()

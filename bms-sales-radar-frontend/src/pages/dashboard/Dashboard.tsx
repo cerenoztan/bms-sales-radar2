@@ -6,6 +6,8 @@ import {
   Routes,
 } from 'react-router-dom';
 
+import PermissionRoute from '../../auth/PermissionRoute';
+
 import UsersPage from '../users/UsersPage';
 import RolesPage from '../roles/RolesPage';
 import PermissionsPage from '../permissions/PermissionsPage';
@@ -38,27 +40,47 @@ export default function Dashboard() {
         <Routes>
           <Route
             index
-            element={<BusinessGrid />}
+            element={
+              <PermissionRoute permission="DASHBOARD_VIEW">
+                <BusinessGrid />
+              </PermissionRoute>
+            }
           />
 
           <Route
             path="businesses"
-            element={<BusinessGrid />}
+            element={
+              <PermissionRoute permission="BUSINESS_VIEW">
+                <BusinessGrid />
+              </PermissionRoute>
+            }
           />
 
           <Route
             path="users"
-            element={<UsersPage />}
+            element={
+              <PermissionRoute permission="USER_VIEW">
+                <UsersPage />
+              </PermissionRoute>
+            }
           />
 
           <Route
             path="roles"
-            element={<RolesPage />}
+            element={
+              <PermissionRoute permission="ROLE_VIEW">
+                <RolesPage />
+              </PermissionRoute>
+            }
           />
 
           <Route
             path="permissions"
-            element={<PermissionsPage />}
+            element={
+              <PermissionRoute permission="PERMISSION_VIEW">
+                <PermissionsPage />
+              </PermissionRoute>
+            }
           />
 
           <Route
