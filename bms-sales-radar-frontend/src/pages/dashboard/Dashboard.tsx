@@ -7,6 +7,9 @@ import {
 } from 'react-router-dom';
 
 import UsersPage from '../users/UsersPage';
+import RolesPage from '../roles/RolesPage';
+import PermissionsPage from '../permissions/PermissionsPage';
+
 import Sidebar from './Sidebar';
 import BusinessGrid from './BusinessGrid';
 
@@ -46,6 +49,16 @@ export default function Dashboard() {
           <Route
             path="users"
             element={<UsersPage />}
+          />
+
+          <Route
+            path="roles"
+            element={<RolesPage />}
+          />
+
+          <Route
+            path="permissions"
+            element={<PermissionsPage />}
           />
 
           <Route

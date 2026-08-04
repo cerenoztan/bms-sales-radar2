@@ -7,7 +7,6 @@ import {
   MinLength,
 } from 'class-validator';
 
-import { UserRole } from '../users.entity';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -23,9 +22,8 @@ export class UpdateUserDto {
   @MinLength(6)
   password?: string;
 
-  @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+
+  roleId?: number;
 
   @IsOptional()
   @IsBoolean()

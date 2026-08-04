@@ -1,118 +1,173 @@
 import * as React from 'react';
 
 import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Snackbar,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Snackbar from '@mui/material/Snackbar';
+import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 
 import CreateRoleDialog from './CreateRoleDialog';
-import type { RoleFormData } from './CreateRoleDialog';
+import type { CreateRolePayload } from './CreateRoleDialog';
 
-interface Role extends RoleFormData {
+const API_URL = 'http://localhost:3000';
+
+interface Role {
   id: number;
+  name: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-const initialRoles: Role[] = [
-  {
-    id: 1,
-    name: 'Yönetici',
-    code: 'ADMIN',
-    description:
-      'Sistemdeki tüm işlemlere erişebilir.',
-    isActive: true,
-  },
-  {
-    id: 2,
-    name: 'Satış Müdürü',
-    code: 'SALES_MANAGER',
-    description:
-      'Satış ekibini ve satış kayıtlarını yönetebilir.',
-    isActive: true,
-  },
-  {
-    id: 3,
-    name: 'Satış Temsilcisi',
-    code: 'SALES_REP',
-    description:
-      'Kendi satış kayıtlarını görüntüleyebilir.',
-    isActive: true,
-  },
-];
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error';
+}
+
+async function readResponse<T>(
+  response: Response,
+): Promise<T> {
+  const data = await response
+    .json()
+    .catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      Array.isArray(data?.message)
+        ? data.message.join(' ')
+        : data?.message ??
+          `İstek başarısız oldu. HTTP ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data as T;
+}
 
 export default function RolesPage() {
   const [roles, setRoles] =
-    React.useState<Role[]>(initialRoles);
+    React.useState<Role[]>([]);
+
+  const [loading, setLoading] =
+    React.useState(true);
 
   const [createOpen, setCreateOpen] =
+    React.useState(false);
+
+  const [creating, setCreating] =
     React.useState(false);
 
   const [editingRole, setEditingRole] =
     React.useState<Role | null>(null);
 
+  const [updating, setUpdating] =
+    React.useState(false);
+
   const [deletingRole, setDeletingRole] =
     React.useState<Role | null>(null);
 
+  const [deleting, setDeleting] =
+    React.useState(false);
+
   const [snackbar, setSnackbar] =
-    React.useState({
+    React.useState<SnackbarState>({
       open: false,
       message: '',
+      severity: 'success',
     });
 
-  const handleCreate = (
-    data: RoleFormData,
-  ) => {
-    const duplicate = roles.some(
-      (role) => role.code === data.code,
-    );
+  const loadRoles =
+    React.useCallback(async () => {
+      try {
+        setLoading(true);
 
-    if (duplicate) {
+        const response = await fetch(
+          `${API_URL}/roles`,
+        );
+
+        const data =
+          await readResponse<Role[]>(
+            response,
+          );
+
+        setRoles(data);
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Roller yüklenemedi.',
+          severity: 'error',
+        });
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  React.useEffect(() => {
+    void loadRoles();
+  }, [loadRoles]);
+
+  const handleCreate = async (
+    payload: CreateRolePayload,
+  ) => {
+    try {
+      setCreating(true);
+
+      const response = await fetch(
+        `${API_URL}/roles`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const createdRole =
+        await readResponse<Role>(
+          response,
+        );
+
+      setRoles((current) => [
+        ...current,
+        createdRole,
+      ]);
+
+      setCreateOpen(false);
+
       setSnackbar({
         open: true,
-        message:
-          'Bu rol kodu zaten kullanılıyor.',
+        message: 'Rol oluşturuldu.',
+        severity: 'success',
       });
-      return;
+    } catch (error) {
+      throw error;
+    } finally {
+      setCreating(false);
     }
-
-    setRoles((current) => [
-      ...current,
-      {
-        id:
-          current.length === 0
-            ? 1
-            : Math.max(
-                ...current.map(
-                  (role) => role.id,
-                ),
-              ) + 1,
-        ...data,
-      },
-    ]);
-
-    setSnackbar({
-      open: true,
-      message: 'Yeni rol eklendi.',
-    });
   };
 
-  const handleEditSave = () => {
+  const handleUpdate = async () => {
     if (!editingRole) {
       return;
     }
@@ -120,86 +175,115 @@ export default function RolesPage() {
     const name =
       editingRole.name.trim();
 
-    const code = editingRole.code
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '_');
-
-    if (!name || !code) {
-      return;
-    }
-
-    const duplicate = roles.some(
-      (role) =>
-        role.id !== editingRole.id &&
-        role.code === code,
-    );
-
-    if (duplicate) {
+    if (!name) {
       setSnackbar({
         open: true,
         message:
-          'Bu rol kodu başka bir rolde kullanılıyor.',
+          'Rol adı boş bırakılamaz.',
+        severity: 'error',
       });
+
       return;
     }
 
-    setRoles((current) =>
-      current.map((role) =>
-        role.id === editingRole.id
-          ? {
-              ...editingRole,
-              name,
-              code,
-              description:
-                editingRole.description.trim(),
-            }
-          : role,
-      ),
-    );
+    try {
+      setUpdating(true);
 
-    setEditingRole(null);
+      const response = await fetch(
+        `${API_URL}/roles/${editingRole.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            name,
+            isActive:
+              editingRole.isActive,
+          }),
+        },
+      );
 
-    setSnackbar({
-      open: true,
-      message: 'Rol güncellendi.',
-    });
+      const updatedRole =
+        await readResponse<Role>(
+          response,
+        );
+
+      setRoles((current) =>
+        current.map((role) =>
+          role.id === updatedRole.id
+            ? updatedRole
+            : role,
+        ),
+      );
+
+      setEditingRole(null);
+
+      setSnackbar({
+        open: true,
+        message: 'Rol güncellendi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Rol güncellenemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deletingRole) {
       return;
     }
 
-    setRoles((current) =>
-      current.filter(
-        (role) =>
-          role.id !== deletingRole.id,
-      ),
-    );
+    try {
+      setDeleting(true);
 
-    setDeletingRole(null);
+      const response = await fetch(
+        `${API_URL}/roles/${deletingRole.id}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
-    setSnackbar({
-      open: true,
-      message: 'Rol silindi.',
-    });
-  };
+      await readResponse<{
+        message: string;
+      }>(response);
 
-  const handleActiveChange = (
-    roleId: number,
-    checked: boolean,
-  ) => {
-    setRoles((current) =>
-      current.map((role) =>
-        role.id === roleId
-          ? {
-              ...role,
-              isActive: checked,
-            }
-          : role,
-      ),
-    );
+      setRoles((current) =>
+        current.filter(
+          (role) =>
+            role.id !== deletingRole.id,
+        ),
+      );
+
+      setDeletingRole(null);
+
+      setSnackbar({
+        open: true,
+        message: 'Rol silindi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Rol silinemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -229,13 +313,9 @@ export default function RolesPage() {
             Rol Tanımlama
           </Typography>
 
-          <Typography
-            sx={{
-              color: 'text.secondary',
-            }}
-          >
+          <Typography color="text.secondary">
             Sistemde kullanılacak rolleri
-            oluşturun ve yönetin.
+            yönetin.
           </Typography>
         </Box>
 
@@ -250,51 +330,62 @@ export default function RolesPage() {
         </Button>
       </Stack>
 
-      <Stack spacing={2}>
-        {roles.map((role) => (
-          <Card
-            key={role.id}
-            variant="outlined"
-            sx={{ borderRadius: 3 }}
-          >
-            <CardContent>
-              <Stack
-                direction={{
-                  xs: 'column',
-                  md: 'row',
-                }}
-                spacing={2}
-                sx={{
-                  justifyContent:
-                    'space-between',
-                  alignItems: {
-                    xs: 'flex-start',
-                    md: 'center',
-                  },
-                }}
-              >
-                <Box>
+      {loading ? (
+        <Stack
+          sx={{
+            minHeight: 300,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <CircularProgress />
+        </Stack>
+      ) : roles.length === 0 ? (
+        <Alert severity="info">
+          Henüz rol tanımlanmamış.
+        </Alert>
+      ) : (
+        <Stack spacing={2}>
+          {roles.map((role) => (
+            <Card
+              key={role.id}
+              variant="outlined"
+              sx={{
+                borderRadius: 3,
+              }}
+            >
+              <CardContent>
+                <Stack
+                  direction={{
+                    xs: 'column',
+                    md: 'row',
+                  }}
+                  spacing={2}
+                  sx={{
+                    justifyContent:
+                      'space-between',
+                    alignItems: {
+                      xs: 'flex-start',
+                      md: 'center',
+                    },
+                  }}
+                >
                   <Stack
                     direction="row"
                     spacing={1}
                     sx={{
                       alignItems: 'center',
                       flexWrap: 'wrap',
-                      mb: 1,
                     }}
                   >
                     <Typography
                       variant="h6"
-                      sx={{ fontWeight: 700 }}
+                      sx={{
+                        fontWeight: 700,
+                      }}
                     >
                       {role.name}
                     </Typography>
-
-                    <Chip
-                      label={role.code}
-                      size="small"
-                      variant="outlined"
-                    />
 
                     <Chip
                       label={
@@ -302,83 +393,58 @@ export default function RolesPage() {
                           ? 'Aktif'
                           : 'Pasif'
                       }
-                      size="small"
                       color={
                         role.isActive
                           ? 'success'
                           : 'default'
                       }
+                      size="small"
                     />
                   </Stack>
 
-                  <Typography
-                    sx={{
-                      color: 'text.secondary',
-                    }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
                   >
-                    {role.description ||
-                      'Açıklama bulunmuyor.'}
-                  </Typography>
-                </Box>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={
+                        <EditOutlinedIcon />
+                      }
+                      onClick={() =>
+                        setEditingRole({
+                          ...role,
+                        })
+                      }
+                    >
+                      Düzenle
+                    </Button>
 
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ alignItems: 'center' }}
-                >
-                  <Switch
-                    checked={role.isActive}
-                    disabled={
-                      role.code === 'ADMIN'
-                    }
-                    onChange={(event) =>
-                      handleActiveChange(
-                        role.id,
-                        event.target.checked,
-                      )
-                    }
-                  />
-
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={
-                      <EditOutlinedIcon />
-                    }
-                    onClick={() =>
-                      setEditingRole({
-                        ...role,
-                      })
-                    }
-                  >
-                    Düzenle
-                  </Button>
-
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    startIcon={
-                      <DeleteOutlineOutlinedIcon />
-                    }
-                    disabled={
-                      role.code === 'ADMIN'
-                    }
-                    onClick={() =>
-                      setDeletingRole(role)
-                    }
-                  >
-                    Sil
-                  </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={
+                        <DeleteIcon />
+                      }
+                      onClick={() =>
+                        setDeletingRole(role)
+                      }
+                    >
+                      Sil
+                    </Button>
+                  </Stack>
                 </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        ))}
-      </Stack>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      )}
 
       <CreateRoleDialog
         open={createOpen}
+        loading={creating}
         onClose={() =>
           setCreateOpen(false)
         }
@@ -387,8 +453,11 @@ export default function RolesPage() {
 
       <Dialog
         open={Boolean(editingRole)}
-        onClose={() =>
-          setEditingRole(null)
+        onClose={
+          updating
+            ? undefined
+            : () =>
+                setEditingRole(null)
         }
         fullWidth
         maxWidth="sm"
@@ -406,6 +475,7 @@ export default function RolesPage() {
               <TextField
                 label="Rol Adı"
                 value={editingRole.name}
+                disabled={updating}
                 onChange={(event) =>
                   setEditingRole({
                     ...editingRole,
@@ -413,40 +483,7 @@ export default function RolesPage() {
                       event.target.value,
                   })
                 }
-                fullWidth
-              />
-
-              <TextField
-                label="Rol Kodu"
-                value={editingRole.code}
-                disabled={
-                  editingRole.code ===
-                  'ADMIN'
-                }
-                onChange={(event) =>
-                  setEditingRole({
-                    ...editingRole,
-                    code:
-                      event.target.value,
-                  })
-                }
-                fullWidth
-              />
-
-              <TextField
-                label="Açıklama"
-                value={
-                  editingRole.description
-                }
-                onChange={(event) =>
-                  setEditingRole({
-                    ...editingRole,
-                    description:
-                      event.target.value,
-                  })
-                }
-                multiline
-                rows={3}
+                required
                 fullWidth
               />
 
@@ -466,10 +503,7 @@ export default function RolesPage() {
                   checked={
                     editingRole.isActive
                   }
-                  disabled={
-                    editingRole.code ===
-                    'ADMIN'
-                  }
+                  disabled={updating}
                   onChange={(event) =>
                     setEditingRole({
                       ...editingRole,
@@ -486,6 +520,7 @@ export default function RolesPage() {
 
         <DialogActions>
           <Button
+            disabled={updating}
             onClick={() =>
               setEditingRole(null)
             }
@@ -495,37 +530,46 @@ export default function RolesPage() {
 
           <Button
             variant="contained"
-            onClick={handleEditSave}
+            disabled={updating}
+            onClick={() =>
+              void handleUpdate()
+            }
           >
-            Kaydet
+            {updating
+              ? 'Kaydediliyor...'
+              : 'Kaydet'}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog
         open={Boolean(deletingRole)}
-        onClose={() =>
-          setDeletingRole(null)
+        onClose={
+          deleting
+            ? undefined
+            : () =>
+                setDeletingRole(null)
         }
-        maxWidth="xs"
         fullWidth
+        maxWidth="xs"
       >
         <DialogTitle>
-          Rolü sil
+          Rolü Sil
         </DialogTitle>
 
         <DialogContent>
-          <Alert severity="warning">
+          <Typography>
             <strong>
               {deletingRole?.name}
             </strong>{' '}
-            rolü silinecek. Bu işlem mevcut
-            frontend listesinden rolü kaldırır.
-          </Alert>
+            rolünü silmek istediğinize
+            emin misiniz?
+          </Typography>
         </DialogContent>
 
         <DialogActions>
           <Button
+            disabled={deleting}
             onClick={() =>
               setDeletingRole(null)
             }
@@ -534,18 +578,23 @@ export default function RolesPage() {
           </Button>
 
           <Button
-            color="error"
             variant="contained"
-            onClick={handleDelete}
+            color="error"
+            disabled={deleting}
+            onClick={() =>
+              void handleDelete()
+            }
           >
-            Sil
+            {deleting
+              ? 'Siliniyor...'
+              : 'Sil'}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3500}
+        autoHideDuration={4000}
         onClose={() =>
           setSnackbar((current) => ({
             ...current,
@@ -554,8 +603,8 @@ export default function RolesPage() {
         }
       >
         <Alert
+          severity={snackbar.severity}
           variant="filled"
-          severity="success"
           onClose={() =>
             setSnackbar((current) => ({
               ...current,

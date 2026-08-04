@@ -1,45 +1,45 @@
 import * as React from 'react';
 
-import {
-  Alert,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 
-export interface RoleFormData {
+export interface CreateRolePayload {
   name: string;
-  code: string;
-  description: string;
   isActive: boolean;
 }
 
 interface CreateRoleDialogProps {
   open: boolean;
+  loading: boolean;
   onClose: () => void;
-  onCreate: (role: RoleFormData) => void;
+  onCreate: (
+    payload: CreateRolePayload,
+  ) => Promise<void>;
 }
 
-const initialForm: RoleFormData = {
+const initialForm: CreateRolePayload = {
   name: '',
-  code: '',
-  description: '',
   isActive: true,
 };
 
 export default function CreateRoleDialog({
   open,
+  loading,
   onClose,
   onCreate,
 }: CreateRoleDialogProps) {
   const [form, setForm] =
-    React.useState<RoleFormData>(initialForm);
+    React.useState<CreateRolePayload>(
+      initialForm,
+    );
 
   const [error, setError] =
     React.useState('');
@@ -51,54 +51,46 @@ export default function CreateRoleDialog({
     }
   }, [open]);
 
-  const handleChange = (
-    field: keyof RoleFormData,
-    value: string | boolean,
-  ) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  };
-
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const name = form.name.trim();
-    const code = form.code
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '_');
 
     if (!name) {
       setError('Rol adı zorunludur.');
       return;
     }
 
-    if (!code) {
-      setError('Rol kodu zorunludur.');
-      return;
+    try {
+      setError('');
+
+      await onCreate({
+        name,
+        isActive: form.isActive,
+      });
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Rol oluşturulamadı.',
+      );
     }
-
-    onCreate({
-      ...form,
-      name,
-      code,
-      description: form.description.trim(),
-    });
-
-    onClose();
   };
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={loading ? undefined : onClose}
       fullWidth
       maxWidth="sm"
     >
-      <DialogTitle>Yeni Rol</DialogTitle>
+      <DialogTitle>
+        Yeni Rol
+      </DialogTitle>
 
       <DialogContent>
-        <Stack spacing={2} sx={{ pt: 1 }}>
+        <Stack
+          spacing={2}
+          sx={{ pt: 1 }}
+        >
           {error && (
             <Alert severity="error">
               {error}
@@ -108,62 +100,39 @@ export default function CreateRoleDialog({
           <TextField
             label="Rol Adı"
             value={form.name}
+            disabled={loading}
             onChange={(event) =>
-              handleChange(
-                'name',
-                event.target.value,
-              )
+              setForm((current) => ({
+                ...current,
+                name:
+                  event.target.value,
+              }))
             }
-            placeholder="Örneğin: Bölge Müdürü"
-            fullWidth
             required
-          />
-
-          <TextField
-            label="Rol Kodu"
-            value={form.code}
-            onChange={(event) =>
-              handleChange(
-                'code',
-                event.target.value,
-              )
-            }
-            placeholder="Örneğin: REGION_MANAGER"
             fullWidth
-            required
-            helperText="Kod büyük harf ve alt çizgi formatına dönüştürülür."
-          />
-
-          <TextField
-            label="Açıklama"
-            value={form.description}
-            onChange={(event) =>
-              handleChange(
-                'description',
-                event.target.value,
-              )
-            }
-            fullWidth
-            multiline
-            rows={3}
           />
 
           <Stack
             direction="row"
             sx={{
+              justifyContent:
+                'space-between',
               alignItems: 'center',
-              justifyContent: 'space-between',
             }}
           >
-            <Typography>Rol aktif</Typography>
+            <Typography>
+              Rol aktif
+            </Typography>
 
             <Switch
               checked={form.isActive}
+              disabled={loading}
               onChange={(event) =>
-                handleChange(
-                  'isActive',
-                  event.target.checked,
-                )
+                setForm((current) => ({
+                  ...current,
+                  isActive:
+                    event.target.checked,
+                }))
               }
             />
           </Stack>
@@ -171,15 +140,23 @@ export default function CreateRoleDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>
+        <Button
+          onClick={onClose}
+          disabled={loading}
+        >
           İptal
         </Button>
 
         <Button
           variant="contained"
-          onClick={handleSubmit}
+          disabled={loading}
+          onClick={() =>
+            void handleSubmit()
+          }
         >
-          Kaydet
+          {loading
+            ? 'Kaydediliyor...'
+            : 'Kaydet'}
         </Button>
       </DialogActions>
     </Dialog>

@@ -7,15 +7,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
-import { User, UserRole } from './users.entity';
+import { User} from './users.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Role } from '../roles/role.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Role)
+    private readonly roleRepository: Repository<Role>,
   ) {}
 
   async create(
@@ -43,11 +46,31 @@ export class UsersService {
       12,
     );
 
+    let role: Role | undefined;
+
+    if (dto.roleId !== undefined) {
+     const foundRole =
+    await this.roleRepository.findOneBy({
+      id: dto.roleId,
+    });
+
+    
+
+     if (!foundRole) {
+    throw new NotFoundException(
+      'Rol bulunamadı.',
+     );
+    }
+
+     role = foundRole;
+    }
+
+
     const user = this.userRepository.create({
       fullName: dto.fullName.trim(),
       email: normalizedEmail,
       passwordHash,
-      role: dto.role ?? UserRole.SALES_REP,
+      role,
       jobTitle:dto.jobTitle,
       isActive: dto.isActive ?? true,
     });
@@ -62,6 +85,9 @@ export class UsersService {
     Array<Omit<User, 'passwordHash'>>
   > {
     const users = await this.userRepository.find({
+      relations:{
+        role :true,
+      },
       order: {
         createdAt: 'DESC',
       },
@@ -125,6 +151,9 @@ export class UsersService {
     if (dto.fullName !== undefined) {
       user.fullName = dto.fullName.trim();
     }
+    if (dto.jobTitle !== undefined) {
+      user.jobTitle = dto.jobTitle.trim();
+    }
 
     if (dto.password !== undefined) {
       user.passwordHash = await bcrypt.hash(
@@ -133,8 +162,23 @@ export class UsersService {
       );
     }
 
-    if (dto.role !== undefined) {
-      user.role = dto.role;
+    if (dto.roleId !== undefined) {
+      if (dto.roleId === null) {
+    user.role = undefined;
+    } else {
+    const role =
+      await this.roleRepository.findOneBy({
+        id: dto.roleId,
+      });
+
+    if (!role) {
+      throw new NotFoundException(
+        'Rol bulunamadı.',
+      );
+    }
+
+     user.role = role;
+       }
     }
 
     if (dto.isActive !== undefined) {
@@ -173,6 +217,9 @@ export class UsersService {
       where: {
         id,
       },
+      relations:{
+        role:true,
+      }
     });
 
     if (!user) {

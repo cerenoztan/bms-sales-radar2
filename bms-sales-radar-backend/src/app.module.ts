@@ -14,6 +14,9 @@ import { UsersModule } from './users/users.module';
 import { User } from './users/users.entity';
 import { AuthModule } from './auth/auth.module';
 import { GooglePlaceEntity } from './google/entities/google-place.entity';
+import { Role } from './roles/role.entity';
+import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permission/permissions.module';
 
 @Module({
   imports: [
@@ -23,7 +26,7 @@ import { GooglePlaceEntity } from './google/entities/google-place.entity';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
-      entities: [Business,Source,User,GooglePlaceEntity],
+      entities: [Business,Source,User,GooglePlaceEntity,Role,],
       synchronize: true,
     }),
     GoogleModule,
@@ -34,6 +37,9 @@ import { GooglePlaceEntity } from './google/entities/google-place.entity';
     SourceModule,
     UsersModule,
     AuthModule,
+    RolesModule,
+    PermissionsModule,
+    
   ],
 })
 export class AppModule {}

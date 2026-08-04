@@ -36,7 +36,7 @@ const menuItems = [
   },
   {
     label: "Yetkilendirme",
-    path: '/permissions',
+    path: '/dashboard/permissions',
     icon: <AdminPanelSettingsIcon/>,
   },
   {

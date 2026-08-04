@@ -2,15 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
-export enum UserRole {
-  ADMIN = 'ADMIN',
-  SALES_MANAGER = 'SALES_MANAGER',
-  SALES_REP = 'SALES_REP',
-}
+import { Role } from '../roles/role.entity';
 
 @Entity('users')
 export class User {
@@ -28,31 +25,31 @@ export class User {
   @Column()
   passwordHash!: string;
 
-  @Column({
-    type: 'text',
-    default: UserRole.SALES_REP,
-  })
-  role!: UserRole;
+  @ManyToOne(
+    () => Role,
+    (role) => role.users,
+    {
+      nullable: true,
+      onDelete: 'SET NULL',
+    },
+  )
+  role?: Role;
 
   @Column({
     default: true,
   })
   isActive!: boolean;
 
+  @Column({
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
+  jobTitle?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
-
-  @Column({
-  type: 'varchar',
-  length: 150,
-  nullable: true,
-  })
-  jobTitle?: string;
-
 }
-
-//role:yetki seviyesi
-//jobTitle:şirketteki görev
