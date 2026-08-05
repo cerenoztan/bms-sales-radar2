@@ -18,6 +18,8 @@ import { Role } from './roles/role.entity';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permission/permissions.module';
 import { Permission } from './permission/permission.entity';
+import { SearchKeyword } from './search-keyword/search-keyword.entity';
+import { SearchKeywordModule } from './search-keyword/search-keyword.module';
 
 @Module({
   imports: [
@@ -27,7 +29,9 @@ import { Permission } from './permission/permission.entity';
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
-      entities: [Business,Source,User,GooglePlaceEntity,Role,Permission,],
+      entities: [Business,Source,User,GooglePlaceEntity,Role,Permission,
+        SearchKeyword, 
+      ],
       synchronize: true,
     }),
     GoogleModule,
@@ -40,6 +44,7 @@ import { Permission } from './permission/permission.entity';
     AuthModule,
     RolesModule,
     PermissionsModule,
+    SearchKeywordModule,
     
   ],
 })

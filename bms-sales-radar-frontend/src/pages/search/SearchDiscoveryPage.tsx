@@ -1,7 +1,6 @@
 import * as React from 'react';
 
 import SearchIcon from '@mui/icons-material/Search';
-import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -12,11 +11,8 @@ import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-
-import {
-  getAccessToken,
-} from '../../auth/authStorage';
 
 interface GoogleSearchResult {
   title?: string;
@@ -24,6 +20,154 @@ interface GoogleSearchResult {
   url: string;
   content?: string;
   contentNoFormatting?: string;
+}
+
+interface SearchKeyword {
+  id: number;
+  keyword: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ResolvedBusinessMatch {
+  placeId: string;
+  name: string;
+  address?: string;
+  googleMapsUrl?: string;
+}
+
+type ResultDateStatus =
+  | 'recent'
+  | 'old'
+  | 'unknown';
+
+interface ResultDateInfo {
+  status: ResultDateStatus;
+  label: string;
+}
+
+const turkishMonths: Record<string, number> = {
+  oca: 0,
+  şub: 1,
+  mar: 2,
+  nis: 3,
+  may: 4,
+  haz: 5,
+  tem: 6,
+  ağu: 7,
+  eyl: 8,
+  eki: 9,
+  kas: 10,
+  ara: 11,
+};
+
+function analyzeResultDate(
+  result: GoogleSearchResult,
+): ResultDateInfo {
+  const text = [
+    result.titleNoFormatting,
+    result.title,
+    result.contentNoFormatting,
+    result.content,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLocaleLowerCase('tr-TR');
+
+  const now = new Date();
+
+  const cutoffDate = new Date(now);
+  cutoffDate.setDate(
+    cutoffDate.getDate() - 30,
+  );
+
+  const relativeMatch = text.match(
+    /(\d+)\s+(dakika|saat|gün|hafta|ay)\s+önce/,
+  );
+
+  if (relativeMatch) {
+    const amount = Number(
+      relativeMatch[1],
+    );
+
+    const unit = relativeMatch[2];
+    const resultDate = new Date(now);
+
+    if (unit === 'dakika') {
+      resultDate.setMinutes(
+        resultDate.getMinutes() -
+          amount,
+      );
+    } else if (unit === 'saat') {
+      resultDate.setHours(
+        resultDate.getHours() -
+          amount,
+      );
+    } else if (unit === 'gün') {
+      resultDate.setDate(
+        resultDate.getDate() -
+          amount,
+      );
+    } else if (unit === 'hafta') {
+      resultDate.setDate(
+        resultDate.getDate() -
+          amount * 7,
+      );
+    } else if (unit === 'ay') {
+      resultDate.setMonth(
+        resultDate.getMonth() -
+          amount,
+      );
+    }
+
+    return {
+      status:
+        resultDate >= cutoffDate
+          ? 'recent'
+          : 'old',
+      label: relativeMatch[0],
+    };
+  }
+
+  const absoluteMatch = text.match(
+    /(\d{1,2})\s+(oca|şub|mar|nis|may|haz|tem|ağu|eyl|eki|kas|ara)\s+(\d{4})/,
+  );
+
+  if (absoluteMatch) {
+    const day = Number(
+      absoluteMatch[1],
+    );
+
+    const month =
+      turkishMonths[
+        absoluteMatch[2]
+      ];
+
+    const year = Number(
+      absoluteMatch[3],
+    );
+
+    const resultDate = new Date(
+      year,
+      month,
+      day,
+    );
+
+    return {
+      status:
+        resultDate >= cutoffDate &&
+        resultDate <= now
+          ? 'recent'
+          : 'old',
+      label: absoluteMatch[0],
+    };
+  }
+
+  return {
+    status: 'unknown',
+    label: 'Tarih belirlenemedi',
+  };
 }
 
 interface SearchElement {
@@ -72,13 +216,6 @@ declare global {
   }
 }
 
-const keywords = [
-  'İstanbul yeni açılan kafe',
-  'İstanbul yakında açılıyor restoran',
-  'İstanbul yeni şube',
-  'grand opening cafe Istanbul',
-  'İstanbul yeni market',
-];
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
@@ -88,19 +225,50 @@ const PSE_SCRIPT_ID =
   'google-pse-script';
 
 export default function SearchDiscoveryPage() {
+  const [keywords, setKeywords] =
+    React.useState<SearchKeyword[]>([]);
+
   const [
     selectedKeyword,
     setSelectedKeyword,
-  ] = React.useState(keywords[0]);
+  ] = React.useState('');
 
+  const [keywordInput, setKeywordInput] =
+    React.useState('');
+    
   const [results, setResults] =
     React.useState<GoogleSearchResult[]>([]);
 
   const [searchReady, setSearchReady] =
     React.useState(false);
 
-  const [savingUrl, setSavingUrl] =
+  const [resolvingUrl, setResolvingUrl] =
     React.useState<string | null>(null);
+
+  const [
+    businessMatches,
+    setBusinessMatches,
+  ] = React.useState<
+    Record<
+      string,
+      ResolvedBusinessMatch[]
+    >
+  >({});
+
+  const [
+    selectedMatches,
+    setSelectedMatches,
+  ] = React.useState<
+    Record<
+      string,
+      ResolvedBusinessMatch
+    >
+  >({});
+
+  const [
+    deletingKeywordId,
+    setDeletingKeywordId,
+  ] = React.useState<number | null>(null);
 
   const [message, setMessage] =
     React.useState<{
@@ -135,16 +303,23 @@ export default function SearchDiscoveryPage() {
         return;
       }
 
-      const uniqueResults = Array.from(
-        new Map(
-          googleResults.map((result) => [
-            result.url,
-            result,
-          ]),
-        ).values(),
-      );
+      setResults((previousResults) => {
+        const combinedResults = [
+          ...previousResults,
+          ...googleResults,
+        ];
 
-      setResults(uniqueResults);
+        return Array.from(
+          new Map(
+            combinedResults.map(
+              (result) => [
+                result.url,
+                result,
+              ],
+            ),
+          ).values(),
+        );
+      });
     };
 
     const waitForSearchElement = (
@@ -281,6 +456,196 @@ export default function SearchDiscoveryPage() {
     };
   }, []);
 
+  const loadKeywords =
+    React.useCallback(async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/search-keywords`,
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            'Anahtar kelimeler alınamadı.',
+          );
+        }
+
+        const data: SearchKeyword[] =
+          await response.json();
+
+        setKeywords(data);
+
+        const firstActiveKeyword =
+          data.find(
+            (item) => item.isActive,
+          );
+
+        setSelectedKeyword(
+          (currentKeyword) => {
+            const currentStillExists =
+              data.some(
+                (item) =>
+                  item.isActive &&
+                  item.keyword ===
+                    currentKeyword,
+              );
+
+            return currentStillExists
+              ? currentKeyword
+              : firstActiveKeyword
+                  ?.keyword ?? '';
+          },
+        );
+      } catch (error) {
+        setMessage({
+          text:
+            error instanceof Error
+              ? error.message
+              : 'Anahtar kelimeler alınamadı.',
+          severity: 'error',
+        });
+      }
+    }, []);
+
+  React.useEffect(() => {
+    void loadKeywords();
+  }, [loadKeywords]);
+
+  const addKeyword = async () => {
+    const normalizedKeyword =
+      keywordInput.trim();
+
+    if (!normalizedKeyword) {
+      setMessage({
+        text:
+          'Bir anahtar kelime girin.',
+        severity: 'error',
+      });
+
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/search-keywords`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            keyword:
+              normalizedKeyword,
+          }),
+        },
+      );
+
+      const responseBody =
+        await response
+          .json()
+          .catch(() => null);
+
+      if (!response.ok) {
+        const errorMessage =
+          Array.isArray(
+            responseBody?.message,
+          )
+            ? responseBody.message.join(
+                ' ',
+              )
+            : responseBody?.message ??
+              'Anahtar kelime eklenemedi.';
+
+        throw new Error(
+          errorMessage,
+        );
+      }
+
+      setKeywordInput('');
+      setSelectedKeyword(
+        responseBody.keyword,
+      );
+
+      await loadKeywords();
+
+      setMessage({
+        text:
+          'Anahtar kelime eklendi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      setMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Anahtar kelime eklenemedi.',
+        severity: 'error',
+      });
+    }
+  };
+
+  const deleteKeyword = async (
+    keyword: SearchKeyword,
+  ) => {
+    const confirmed = window.confirm(
+      `“${keyword.keyword}” anahtar kelimesini silmek istediğinize emin misiniz?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingKeywordId(keyword.id);
+
+      const response = await fetch(
+        `${API_URL}/search-keywords/${keyword.id}`,
+        {
+          method: 'DELETE',
+        },
+      );
+
+      if (!response.ok) {
+        const responseBody =
+          await response
+            .json()
+            .catch(() => null);
+
+        throw new Error(
+          responseBody?.message ??
+            'Anahtar kelime silinemedi.',
+        );
+      }
+
+      if (
+        selectedKeyword ===
+        keyword.keyword
+      ) {
+        setResults([]);
+        setBusinessMatches({});
+        setSelectedMatches({});
+      }
+
+      await loadKeywords();
+
+      setMessage({
+        text:
+          'Anahtar kelime silindi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      setMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Anahtar kelime silinemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setDeletingKeywordId(null);
+    }
+  };
+
   const runSearch = () => {
     const searchElement =
       window.google?.search.cse.element
@@ -302,50 +667,38 @@ export default function SearchDiscoveryPage() {
       `site:instagram.com ${selectedKeyword}`;
 
     setResults([]);
+    setBusinessMatches({});
+    setSelectedMatches({});
 
     searchElement.execute(query);
   };
 
-  const saveResult = async (
+  const resolveBusiness = async (
     result: GoogleSearchResult,
   ) => {
     try {
-      setSavingUrl(result.url);
-
-      const token =
-        getAccessToken();
+      setResolvingUrl(result.url);
 
       const response = await fetch(
-        `${API_URL}/sources/search-result`,
+        `${API_URL}/google/resolve-business`,
         {
           method: 'POST',
-
           headers: {
             'Content-Type':
               'application/json',
-
-            ...(token
-              ? {
-                  Authorization:
-                    `Bearer ${token}`,
-                }
-              : {}),
           },
-
           body: JSON.stringify({
-            name:
+            title:
               result
                 .titleNoFormatting ??
               result.title ??
               result.url,
-
-            url: result.url,
-
-            platform:
-              'INSTAGRAM',
-
-            searchQuery:
-              selectedKeyword,
+            instagramUrl:
+              result.url,
+            snippet:
+              result
+                .contentNoFormatting ??
+              result.content,
           }),
         },
       );
@@ -364,30 +717,68 @@ export default function SearchDiscoveryPage() {
                 ' ',
               )
             : responseBody?.message ??
-              'Aday kaydedilemedi.';
+              'İşletme bilgileri bulunamadı.';
 
         throw new Error(
           errorMessage,
         );
       }
 
+      const matches =
+        responseBody as
+          ResolvedBusinessMatch[];
+
+      setBusinessMatches(
+        (currentMatches) => ({
+          ...currentMatches,
+          [result.url]: matches,
+        }),
+      );
+
+      setSelectedMatches(
+        (currentMatches) => {
+          const nextMatches = {
+            ...currentMatches,
+          };
+
+          delete nextMatches[
+            result.url
+          ];
+
+          return nextMatches;
+        },
+      );
+
       setMessage({
-        text:
-          'Kaynak başarıyla kaydedildi.',
-        severity: 'success',
+        text: matches.length
+          ? `${matches.length} işletme eşleşmesi bulundu.`
+          : 'Bu sonuç için işletme eşleşmesi bulunamadı.',
+        severity: matches.length
+          ? 'success'
+          : 'error',
       });
     } catch (error) {
       setMessage({
         text:
           error instanceof Error
             ? error.message
-            : 'Aday kaydedilemedi.',
+            : 'İşletme bilgileri bulunamadı.',
         severity: 'error',
       });
     } finally {
-      setSavingUrl(null);
+      setResolvingUrl(null);
     }
   };
+
+  const visibleResults = React.useMemo(
+    () =>
+      results.filter(
+        (result) =>
+          analyzeResultDate(result)
+            .status !== 'old',
+      ),
+    [results],
+  );
 
   return (
     <Stack spacing={3}>
@@ -426,6 +817,46 @@ export default function SearchDiscoveryPage() {
           </Typography>
 
           <Stack
+            direction={{
+              xs: 'column',
+              sm: 'row',
+            }}
+            spacing={1}
+          >
+            <TextField
+              fullWidth
+              size="small"
+              label="Yeni anahtar kelime"
+              value={keywordInput}
+              onChange={(event) => {
+                setKeywordInput(
+                  event.target.value,
+                );
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key === 'Enter'
+                ) {
+                  event.preventDefault();
+                  void addKeyword();
+                }
+              }}
+            />
+
+            <Button
+              variant="outlined"
+              disabled={
+                !keywordInput.trim()
+              }
+              onClick={() => {
+                void addKeyword();
+              }}
+            >
+              Ekle
+            </Button>
+          </Stack>
+
+          <Stack
             direction="row"
             spacing={1}
             useFlexGap
@@ -433,26 +864,40 @@ export default function SearchDiscoveryPage() {
               flexWrap: 'wrap',
             }}
           >
-            {keywords.map(
-              (keyword) => (
+            {keywords
+              .filter(
+                (keyword) =>
+                  keyword.isActive,
+              )
+              .map((keyword) => (
                 <Chip
-                  key={keyword}
-                  label={keyword}
+                  key={keyword.id}
+                  label={
+                    keyword.keyword
+                  }
                   clickable
+                  disabled={
+                    deletingKeywordId ===
+                    keyword.id
+                  }
                   color={
                     selectedKeyword ===
-                    keyword
+                    keyword.keyword
                       ? 'primary'
                       : 'default'
                   }
                   onClick={() => {
                     setSelectedKeyword(
+                      keyword.keyword,
+                    );
+                  }}
+                  onDelete={() => {
+                    void deleteKeyword(
                       keyword,
                     );
                   }}
                 />
-              ),
-            )}
+              ))}
           </Stack>
 
           <Button
@@ -460,7 +905,10 @@ export default function SearchDiscoveryPage() {
             startIcon={
               <SearchIcon />
             }
-            disabled={!searchReady}
+            disabled={
+              !searchReady ||
+              !selectedKeyword
+            }
             onClick={runSearch}
           >
             {searchReady
@@ -496,7 +944,17 @@ export default function SearchDiscoveryPage() {
             Kaydedilebilir sonuçlar
           </Typography>
 
-          {results.map(
+          <Typography
+            variant="body2"
+            color="text.secondary"
+          >
+            {results.length} benzersiz sonuç
+            toplandı.{' '}
+            {visibleResults.length} sonuç
+            gösteriliyor.
+          </Typography>
+
+          {visibleResults.map(
             (result) => (
               <Paper
                 key={result.url}
@@ -532,16 +990,38 @@ export default function SearchDiscoveryPage() {
                       'Açıklama bulunamadı.'}
                   </Typography>
 
+                  <Chip
+                    size="small"
+                    label={
+                      analyzeResultDate(
+                        result,
+                      ).label
+                    }
+                    color={
+                      analyzeResultDate(
+                        result,
+                      ).status ===
+                      'recent'
+                        ? 'success'
+                        : 'warning'
+                    }
+                    variant="outlined"
+                    sx={{
+                      alignSelf:
+                        'flex-start',
+                    }}
+                  />
+
                   <Box>
                     <Button
                       size="small"
                       variant="outlined"
                       disabled={
-                        savingUrl ===
+                        resolvingUrl ===
                         result.url
                       }
                       startIcon={
-                        savingUrl ===
+                        resolvingUrl ===
                         result.url
                           ? (
                             <CircularProgress
@@ -549,18 +1029,144 @@ export default function SearchDiscoveryPage() {
                             />
                           )
                           : (
-                            <SaveOutlinedIcon />
+                            <SearchIcon />
                           )
                       }
                       onClick={() => {
-                        void saveResult(
+                        void resolveBusiness(
                           result,
                         );
                       }}
                     >
-                      Aday olarak kaydet
+                      {resolvingUrl ===
+                      result.url
+                        ? 'İşletme aranıyor'
+                        : 'İşletme bilgilerini bul'}
                     </Button>
                   </Box>
+
+                  {(businessMatches[
+                    result.url
+                  ]?.length ?? 0) >
+                    0 && (
+                    <Stack spacing={1}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 700,
+                        }}
+                      >
+                        Google Places
+                        eşleşmeleri
+                      </Typography>
+
+                      {businessMatches[
+                        result.url
+                      ].map((match) => {
+                        const isSelected =
+                          selectedMatches[
+                            result.url
+                          ]?.placeId ===
+                          match.placeId;
+
+                        return (
+                          <Paper
+                            key={
+                              match.placeId
+                            }
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              borderColor:
+                                isSelected
+                                  ? 'primary.main'
+                                  : 'divider',
+                              bgcolor:
+                                isSelected
+                                  ? 'action.selected'
+                                  : 'background.paper',
+                            }}
+                          >
+                            <Stack
+                              spacing={1}
+                            >
+                              <Typography
+                                sx={{
+                                  fontWeight:
+                                    600,
+                                }}
+                              >
+                                {match.name}
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                color=
+                                  "text.secondary"
+                              >
+                                {match.address ??
+                                  'Adres bulunamadı.'}
+                              </Typography>
+
+                              <Stack
+                                direction={{
+                                  xs: 'column',
+                                  sm: 'row',
+                                }}
+                                spacing={1}
+                                sx={{
+                                  alignItems: {
+                                    xs:
+                                      'stretch',
+                                    sm:
+                                      'center',
+                                  },
+                                }}
+                              >
+                                {match.googleMapsUrl && (
+                                  <Link
+                                    href={
+                                      match.googleMapsUrl
+                                    }
+                                    target="_blank"
+                                    rel=
+                                      "noopener noreferrer"
+                                  >
+                                    Google Maps’te
+                                    aç
+                                  </Link>
+                                )}
+
+                                <Button
+                                  size="small"
+                                  variant={
+                                    isSelected
+                                      ? 'contained'
+                                      : 'outlined'
+                                  }
+                                  onClick={() => {
+                                    setSelectedMatches(
+                                      (
+                                        currentMatches,
+                                      ) => ({
+                                        ...currentMatches,
+                                        [result.url]:
+                                          match,
+                                      }),
+                                    );
+                                  }}
+                                >
+                                  {isSelected
+                                    ? 'Seçildi'
+                                    : 'Bu işletmeyi seç'}
+                                </Button>
+                              </Stack>
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
             ),

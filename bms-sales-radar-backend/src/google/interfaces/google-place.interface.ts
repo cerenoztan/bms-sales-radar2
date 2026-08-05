@@ -17,3 +17,10 @@ export interface DistrictPlaceResult {
   success: boolean;
   error?: unknown;
 }
+
+export interface ResolvedBusinessMatch {
+  placeId: string;
+  name: string;
+  address?: string;
+  googleMapsUrl?: string;
+}
