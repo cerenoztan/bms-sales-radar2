@@ -5,7 +5,7 @@ import {
   Route,
   Routes,
 } from 'react-router-dom';
-
+import SearchDiscoveryPage from '../search/SearchDiscoveryPage';
 import PermissionRoute from '../../auth/PermissionRoute';
 
 import UsersPage from '../users/UsersPage';
@@ -54,6 +54,14 @@ export default function Dashboard() {
                 <BusinessGrid />
               </PermissionRoute>
             }
+          />
+          <Route
+            path="search"
+            element={
+           <PermissionRoute permission="SEARCH_DISCOVERY_VIEW">
+            <SearchDiscoveryPage />
+         </PermissionRoute>
+           }
           />
 
           <Route

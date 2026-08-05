@@ -1,8 +1,8 @@
-import {Injectable,NotFoundException,} from '@nestjs/common';
+import {Injectable,NotFoundException,BadRequestException} from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
+import { SaveSearchResultDto } from './dto/save-search-result.dto';
 import { Business } from '../business/business.entity';
 import { Source } from './source.entity';
 
@@ -64,6 +64,93 @@ export class SourceService{
 
         return this.sourceRepository.save(source);
     }
+    async saveSearchResult(
+  dto: SaveSearchResultDto,
+): Promise<Source> {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(dto.url);
+  } catch {
+    throw new BadRequestException(
+      'Geçersiz kaynak adresi.',
+    );
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new BadRequestException(
+      'Yalnızca HTTPS adresleri kabul edilir.',
+    );
+  }
+
+  const hostname = parsedUrl.hostname
+    .toLocaleLowerCase('en-US')
+    .replace(/^www\./, '');
+
+  const pathParts = parsedUrl.pathname
+    .split('/')
+    .filter(Boolean);
+
+  if (dto.platform === 'INSTAGRAM') {
+    const blockedInstagramPaths = new Set([
+      'accounts',
+      'direct',
+      'explore',
+      'p',
+      'reel',
+      'reels',
+      'stories',
+    ]);
+
+    const username = pathParts[0];
+
+    if (
+      hostname !== 'instagram.com' ||
+      pathParts.length !== 1 ||
+      !username ||
+      blockedInstagramPaths.has(
+        username.toLocaleLowerCase('en-US'),
+      )
+    ) {
+      throw new BadRequestException(
+        'Yalnızca Instagram profil adresleri kaydedilebilir.',
+      );
+    }
+  }
+
+  if (dto.platform === 'LINKEDIN') {
+    if (
+      hostname !== 'linkedin.com' ||
+      pathParts[0] !== 'company' ||
+      !pathParts[1]
+    ) {
+      throw new BadRequestException(
+        'Yalnızca LinkedIn şirket sayfaları kaydedilebilir.',
+      );
+    }
+  }
+
+  parsedUrl.hostname = hostname;
+  parsedUrl.search = '';
+  parsedUrl.hash = '';
+
+  parsedUrl.pathname =
+    `/${pathParts.join('/')}/`;
+
+  const normalizedUrl = parsedUrl.toString();
+
+  const externalId = [
+    'GOOGLE_PSE',
+    dto.platform,
+    normalizedUrl,
+  ].join(':');
+
+  return this.create(
+    dto.name.trim(),
+    normalizedUrl,
+    externalId,
+  );
+ }
     async findSources():Promise<Source[]>{
         return this.sourceRepository.find({
             //relations shows the relationship that is defined with one to many and many to one

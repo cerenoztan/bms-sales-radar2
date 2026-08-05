@@ -1,8 +1,11 @@
 import {
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
+
 import { InjectRepository } from '@nestjs/typeorm';
+
 import {
   In,
   Repository,
@@ -12,7 +15,8 @@ import { Permission } from './permission.entity';
 import { Role } from '../roles/role.entity';
 
 @Injectable()
-export class PermissionsService {
+export class PermissionsService
+  implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(Permission)
     private readonly permissionRepository:
@@ -22,6 +26,16 @@ export class PermissionsService {
     private readonly roleRepository:
       Repository<Role>,
   ) {}
+
+  /**
+   * NestJS uygulaması açıldıktan sonra çalışır.
+   *
+   * Veritabanında bulunmayan varsayılan
+   * izinleri otomatik olarak oluşturur.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    await this.seedDefaults();
+  }
 
   async findAll(): Promise<Permission[]> {
     return this.permissionRepository.find({
@@ -53,75 +67,91 @@ export class PermissionsService {
     return role.permissions;
   }
 
-  async seedDefaults(): Promise<Permission[]> {
-  const defaults = [
-    {
-      name: 'Dashboard görüntüleme',
-      key: 'DASHBOARD_VIEW',
-    },
-    {
-      name: 'Kullanıcıları görüntüleme',
-      key: 'USER_VIEW',
-    },
-    {
-      name: 'Kullanıcı oluşturma',
-      key: 'USER_CREATE',
-    },
-    {
-      name: 'Kullanıcı güncelleme',
-      key: 'USER_UPDATE',
-    },
-    {
-      name: 'Kullanıcı silme',
-      key: 'USER_DELETE',
-    },
-    {
-      name: 'Rolleri görüntüleme',
-      key: 'ROLE_VIEW',
-    },
-    {
-      name: 'Rol oluşturma',
-      key: 'ROLE_CREATE',
-    },
-    {
-      name: 'Rol güncelleme',
-      key: 'ROLE_UPDATE',
-    },
-    {
-      name: 'Rol silme',
-      key: 'ROLE_DELETE',
-    },
-    {
-      name: 'Yetkilendirmeyi görüntüleme',
-      key: 'PERMISSION_VIEW',
-    },
-    {
-      name: 'Yetkilendirmeyi güncelleme',
-      key: 'PERMISSION_UPDATE',
-    },
-    {
-      name: 'Raporları görüntüleme',
-      key: 'REPORT_VIEW',
-    },
-  ];
+  /**
+   * Eksik varsayılan izinleri oluşturur.
+   *
+   * Mevcut izinleri değiştirmez veya silmez.
+   * Aynı key'e sahip izin varsa tekrar eklemez.
+   */
+  private async seedDefaults(): Promise<void> {
+    const defaults = [
+      {
+        name: 'Dashboard görüntüleme',
+        key: 'DASHBOARD_VIEW',
+      },
+      {
+        name: 'Aday keşfini görüntüleme',
+        key: 'SEARCH_DISCOVERY_VIEW',
+      },
+      {
+        name: 'Kullanıcıları görüntüleme',
+        key: 'USER_VIEW',
+      },
+      {
+        name: 'Kullanıcı oluşturma',
+        key: 'USER_CREATE',
+      },
+      {
+        name: 'Kullanıcı güncelleme',
+        key: 'USER_UPDATE',
+      },
+      {
+        name: 'Kullanıcı silme',
+        key: 'USER_DELETE',
+      },
+      {
+        name: 'Rolleri görüntüleme',
+        key: 'ROLE_VIEW',
+      },
+      {
+        name: 'Rol oluşturma',
+        key: 'ROLE_CREATE',
+      },
+      {
+        name: 'Rol güncelleme',
+        key: 'ROLE_UPDATE',
+      },
+      {
+        name: 'Rol silme',
+        key: 'ROLE_DELETE',
+      },
+      {
+        name: 'Yetkilendirmeyi görüntüleme',
+        key: 'PERMISSION_VIEW',
+      },
+      {
+        name: 'Yetkilendirmeyi güncelleme',
+        key: 'PERMISSION_UPDATE',
+      },
+      {
+        name: 'Raporları görüntüleme',
+        key: 'REPORT_VIEW',
+      },
+    ];
 
-  for (const item of defaults) {
-    const existing =
-      await this.permissionRepository.findOne({
-        where: {
+    for (const item of defaults) {
+      const existing =
+        await this.permissionRepository.findOne({
+          where: {
+            key: item.key,
+          },
+        });
+
+      if (existing) {
+        continue;
+      }
+
+      const permission =
+        this.permissionRepository.create({
+          name: item.name,
           key: item.key,
-        },
-      });
+        });
 
-    if (!existing) {
       await this.permissionRepository.save(
-        this.permissionRepository.create(item),
+        permission,
       );
     }
   }
-
-  return this.findAll();
- }
 
   async updateRolePermissions(
     roleId: number,
@@ -143,18 +173,22 @@ export class PermissionsService {
       );
     }
 
+    const uniquePermissionIds = [
+      ...new Set(permissionIds),
+    ];
+
     const permissions =
-      permissionIds.length === 0
+      uniquePermissionIds.length === 0
         ? []
         : await this.permissionRepository.find({
             where: {
-              id: In(permissionIds),
+              id: In(uniquePermissionIds),
             },
           });
 
     if (
       permissions.length !==
-      permissionIds.length
+      uniquePermissionIds.length
     ) {
       throw new NotFoundException(
         'Gönderilen yetkilerden biri veya birkaçı bulunamadı.',

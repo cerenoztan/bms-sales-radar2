@@ -9,7 +9,7 @@ import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import RadarOutlinedIcon from '@mui/icons-material/RadarOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import SourceOutlinedIcon from '@mui/icons-material/SourceOutlined';
-
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -29,7 +29,9 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 
-const API_URL = 'http://localhost:3000';
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  'http://localhost:3000';
 
 interface Role {
   id: number;
@@ -89,6 +91,18 @@ function getGroupDefinition(
       description: 'Ana gösterge paneli erişimi',
       icon: <DashboardOutlinedIcon />,
     };
+  }
+  if (
+  permissionKey.startsWith(
+    'SEARCH_DISCOVERY_',
+  )
+  ) {
+  return {
+    module: 'Aday Keşfi',
+    description:
+      'Google araması ve aday keşfi erişimi',
+    icon: <SearchOutlinedIcon />,
+  };
   }
 
   if (permissionKey.startsWith('BUSINESS_')) {
@@ -214,9 +228,6 @@ export default function PermissionsPage() {
   ] = React.useState(false);
 
   const [saving, setSaving] =
-    React.useState(false);
-
-  const [seeding, setSeeding] =
     React.useState(false);
 
   const [pageError, setPageError] =
@@ -496,46 +507,6 @@ export default function PermissionsPage() {
     }
   };
 
-  const handleSeedPermissions =
-    async () => {
-      try {
-        setSeeding(true);
-
-        const response = await fetch(
-          `${API_URL}/permissions/seed`,
-          {
-            method: 'POST',
-          },
-        );
-
-        const seededPermissions =
-          await readResponse<
-            Permission[]
-          >(response);
-
-        setPermissions(
-          seededPermissions,
-        );
-
-        setSnackbar({
-          open: true,
-          message:
-            'Yetki seçenekleri oluşturuldu.',
-          severity: 'success',
-        });
-      } catch (error) {
-        setSnackbar({
-          open: true,
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Yetki seçenekleri oluşturulamadı.',
-          severity: 'error',
-        });
-      } finally {
-        setSeeding(false);
-      }
-    };
 
   if (loading) {
     return (
@@ -595,19 +566,7 @@ export default function PermissionsPage() {
           }}
           spacing={1.5}
         >
-          {permissions.length === 0 && (
-            <Button
-              variant="outlined"
-              disabled={seeding}
-              onClick={() =>
-                void handleSeedPermissions()
-              }
-            >
-              {seeding
-                ? 'Oluşturuluyor...'
-                : 'Yetki Seçeneklerini Oluştur'}
-            </Button>
-          )}
+        
 
           <Button
             variant="outlined"

@@ -7,7 +7,7 @@ import {
   ParseIntPipe,
   Post,
 } from '@nestjs/common';
-
+import { SaveSearchResultDto } from './dto/save-search-result.dto';
 import { CreateSourceDto } from './dto/create-source.dto';
 import { SourceService } from './source.service';
 
@@ -23,7 +23,15 @@ export class SourceController {
           createSourceDto.url,
           createSourceDto.externalId,
           createSourceDto.businessID,);
-    }
+  }
+  
+  @Post('search-result')
+  saveSearchResult(
+  @Body() dto: SaveSearchResultDto,
+  ) {
+  return this.sourceService.saveSearchResult(dto);
+  }
+
   @Get()
   findSources(){
     return this.sourceService.findSources();

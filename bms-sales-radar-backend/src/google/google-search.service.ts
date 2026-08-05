@@ -55,8 +55,6 @@ export class GoogleSearchService {
         'GOOGLE_ENGINE_ID',
       );
       
-    console.log('API KEY:', this.configService.get('GOOGLE_API_KEY'));
-    console.log('CX:', this.configService.get('GOOGLE_ENGINE_ID'));
 
     if (!apiKey || !searchEngineId) {
       throw new ServiceUnavailableException(

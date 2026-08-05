@@ -5,7 +5,6 @@ import {
   Param,
   ParseIntPipe,
   Put,
-  Post,
 } from '@nestjs/common';
 
 import { PermissionsService } from './permissions.service';
@@ -32,10 +31,7 @@ export class PermissionsController {
       roleId,
     );
   }
-  @Post('permissions/seed')
-  seedDefaults() {
-  return this.permissionsService.seedDefaults();
-  }
+ 
 
   @Put('roles/:roleId/permissions')
   updateRolePermissions(

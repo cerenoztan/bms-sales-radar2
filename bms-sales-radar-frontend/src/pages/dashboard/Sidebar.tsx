@@ -15,6 +15,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import RadarIcon from '@mui/icons-material/Radar';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SearchIcon from '@mui/icons-material/Search';
 
 const drawerWidth = 260;
 
@@ -23,6 +24,11 @@ const menuItems = [
     label: 'Ana Sayfa',
     path: '/dashboard',
     icon: <DashboardIcon />,
+  },
+  {
+  label: 'Aday Keşfi',
+  path: '/dashboard/search',
+  icon: <SearchIcon />,
   },
   {
     label: 'Kullanıcılar',
