@@ -7,13 +7,19 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 
 import { CreateSearchKeywordDto } from './dto/create-search-keyword.dto';
 import { UpdateSearchKeywordDto } from './dto/update-search-keyword.dto';
 import { SearchKeywordService } from './search-keyword.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/require-permissions.decorator';
 
 @Controller('search-keywords')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('SEARCH_DISCOVERY_VIEW')
 export class SearchKeywordController {
   constructor(
     private readonly keywordService:

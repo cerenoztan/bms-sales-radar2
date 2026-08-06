@@ -6,9 +6,16 @@ import { GoogleSearchService } from './google-search.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GooglePlaceEntity } from './entities/google-place.entity';
 import { BusinessResolverService } from './business-resolver.service';
+import { GoogleScanRunEntity } from './entities/google-scan-run.entity';
 
 @Module({
-  imports: [HttpModule,TypeOrmModule.forFeature([GooglePlaceEntity])],
+  imports: [
+    HttpModule,
+    TypeOrmModule.forFeature([
+      GooglePlaceEntity,
+      GoogleScanRunEntity,
+    ]),
+  ],
   controllers: [GoogleController],
   providers: [GoogleService,GoogleSearchService,BusinessResolverService,],
   exports: [GoogleService,GoogleSearchService,BusinessResolverService,],

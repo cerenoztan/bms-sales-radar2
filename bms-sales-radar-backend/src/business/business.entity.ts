@@ -29,6 +29,21 @@ export class Business {
   @Column({nullable:true})
   instagramUrl?: string;
 
+  @Column({ nullable: true })
+  facebookUrl?: string;
+
+  @Column({ nullable: true })
+  googleMapsUrl?: string;
+
+  @Column({ nullable: true, unique: true })
+  googlePlaceId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  discoverySource?: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes?: string;
+
  @Column({nullable:true})
   address?: string;
 

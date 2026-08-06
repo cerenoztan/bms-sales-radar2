@@ -5,10 +5,10 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { writeFile } from 'node:fs/promises';
 
 import { join } from 'node:path';
-//business data
-import { BusinessService } from '../business/business.service';
 //generates excel file
 import { ExcelReportService } from './excel-report.service';
+import { GoogleService } from '../google/google-place.service';
+import { BusinessService } from '../business/business.service';
 
 @Injectable()
 export class ReportScheduler{
@@ -16,8 +16,9 @@ export class ReportScheduler{
     private readonly logger=new Logger(ReportScheduler.name,);
     //writing the services to constructor that will be used 
     constructor(
-        private readonly businessService:BusinessService,
         private readonly excelReportService:ExcelReportService,
+        private readonly googleService: GoogleService,
+        private readonly businessService: BusinessService,
     ){}
     //no need for calling when cron is used
     @Cron(CronExpression.EVERY_WEEK)
@@ -25,14 +26,15 @@ export class ReportScheduler{
     // a Promise without a return is void
     async createReport(): Promise<void>{
       try{  
-        const businesses=await this.businessService.findAllSortedByScore();
-        //Buffer is a temporary in-memory representation of binary data (such as an Excel file, PDF, or image) 
-        // that can be saved, sent, or processed before being written to disk.
-        const buffer=await this.excelReportService.createBusinessReport(businesses,);
+        await this.googleService.findNewBusinesses();
+        const candidates =
+          await this.businessService.findAllSortedByScore();
+        const buffer = await this.excelReportService
+          .createSavedCandidatesReport(candidates);
         //YYYY-MM-DD format
         const date=new Date().toISOString().slice(0,10);
 
-        const fileName =`business-report-${date}.xlsx`;
+        const fileName =`saved-candidates-${date}.xlsx`;
         //full path of file
         const filePath = join( process.cwd(),fileName,);
 

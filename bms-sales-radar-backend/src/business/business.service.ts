@@ -31,13 +31,23 @@ export class BusinessService {
      const phone=this.duplicateChecker.normalizePhone(createBusinessDto.phone,);
      const instagramUrl=this.duplicateChecker.normalizeInstagram(createBusinessDto.instagramUrl,);
 
-     const duplicate=await this.duplicateChecker.findDuplicate(phone,instagramUrl,createBusinessDto.name,createBusinessDto.address,);
+     const duplicate=await this.duplicateChecker.findDuplicate(
+       phone,
+       instagramUrl,
+       createBusinessDto.name,
+       createBusinessDto.address,
+       createBusinessDto.googlePlaceId,
+     );
 
      if(duplicate){
       this.businessRepository.merge(duplicate,{...createBusinessDto,
         // use phone if exists otherwise merge the new phone
         phone:phone ?? duplicate.phone,
         instagramUrl:instagramUrl??duplicate.instagramUrl,
+        facebookUrl:createBusinessDto.facebookUrl ?? duplicate.facebookUrl,
+        googleMapsUrl:createBusinessDto.googleMapsUrl ?? duplicate.googleMapsUrl,
+        googlePlaceId:createBusinessDto.googlePlaceId ?? duplicate.googlePlaceId,
+        discoverySource:createBusinessDto.discoverySource ?? duplicate.discoverySource,
       });
 
       const scoredBusiness=this.scoreService.createScoredBusiness(duplicate);

@@ -25,6 +25,10 @@ export class UsersService {
     
   ) {}
 
+  async hasUsers(): Promise<boolean> {
+    return (await this.userRepository.count()) > 0;
+  }
+
   async create(
     dto: CreateUserDto,
   ): Promise<Omit<User, 'passwordHash'>> {
@@ -161,6 +165,17 @@ if (isFirstUser) {
         permissions: true,
       },
     },
+    });
+  }
+
+  async findAuthUserById(id: number): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id },
+      relations: {
+        role: {
+          permissions: true,
+        },
+      },
     });
   }
 

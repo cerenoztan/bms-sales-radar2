@@ -1,11 +1,5 @@
 import { Transform } from 'class-transformer';
-import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export class ResolveBusinessDto {
   @Transform(({ value }) =>
@@ -16,16 +10,22 @@ export class ResolveBusinessDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  title!: string;
+  businessName!: string;
 
+  @IsOptional()
   @IsUrl({
     protocols: ['https'],
     require_protocol: true,
   })
-  instagramUrl!: string;
+  sourceUrl?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(1000)
-  snippet?: string;
+  @MaxLength(250)
+  locationHint?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
 }

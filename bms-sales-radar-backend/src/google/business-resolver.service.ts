@@ -34,19 +34,18 @@ export class BusinessResolverService {
 
   async resolveBusiness(
     title: string,
-    instagramUrl: string,
-    snippet?: string,
+    sourceUrl?: string,
+    locationHint?: string,
+    city = 'İstanbul',
   ): Promise<ResolvedBusinessMatch[]> {
     const apiKey =
       this.configService.getOrThrow<string>(
         'GOOGLE_API_KEY',
       );
 
-    const username =
-      this.extractInstagramUsername(
-        instagramUrl,
-        `${title} ${snippet ?? ''}`,
-      );
+    const username = sourceUrl
+      ? this.extractInstagramUsername(sourceUrl, title)
+      : undefined;
 
     const cleanedTitle =
       this.cleanTitle(title);
@@ -54,7 +53,8 @@ export class BusinessResolverService {
     const textQuery = [
       username,
       cleanedTitle,
-      'İstanbul',
+      locationHint,
+      city,
     ]
       .filter(Boolean)
       .join(' ')
@@ -86,6 +86,7 @@ export class BusinessResolverService {
                 'places.id',
                 'places.displayName',
                 'places.formattedAddress',
+                'places.nationalPhoneNumber',
                 'places.googleMapsUri',
               ].join(','),
             },
@@ -112,6 +113,7 @@ export class BusinessResolverService {
             place.formattedAddress,
           googleMapsUrl:
             place.googleMapsUri,
+          phone: place.nationalPhoneNumber,
         }));
     } catch (error: unknown) {
       if (error instanceof AxiosError) {
@@ -138,19 +140,17 @@ export class BusinessResolverService {
   }
 
   private extractInstagramUsername(
-    instagramUrl: string,
+    sourceUrl: string,
     resultText: string,
   ): string | undefined {
     let parsedUrl: URL;
 
     try {
       parsedUrl = new URL(
-        instagramUrl,
+        sourceUrl,
       );
     } catch {
-      throw new BadRequestException(
-        'Geçersiz Instagram adresi.',
-      );
+      return undefined;
     }
 
     const hostname = parsedUrl.hostname
@@ -158,9 +158,7 @@ export class BusinessResolverService {
       .replace(/^www\./, '');
 
     if (hostname !== 'instagram.com') {
-      throw new BadRequestException(
-        'Yalnızca Instagram adresleri kabul edilir.',
-      );
+      return undefined;
     }
 
     const pathParts =

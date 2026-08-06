@@ -7,12 +7,22 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
 import Link from '@mui/material/Link';
+import Pagination from '@mui/material/Pagination';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import {
+  authenticatedFetch,
+  hasPermission,
+} from '../../auth/authStorage';
 
 interface GoogleSearchResult {
   title?: string;
@@ -35,6 +45,34 @@ interface ResolvedBusinessMatch {
   name: string;
   address?: string;
   googleMapsUrl?: string;
+  phone?: string;
+}
+
+interface GoogleMapCandidate {
+  district: string;
+  place: {
+    id: string;
+    displayName?: { text: string };
+    formattedAddress?: string;
+    nationalPhoneNumber?: string;
+    googleMapsUri?: string;
+  };
+}
+
+type CandidateConfidence =
+  | 'HIGH'
+  | 'MEDIUM'
+  | 'LOW';
+
+interface CaptionCandidate {
+  id: string;
+  businessName: string;
+  instagramUrl: string;
+  locationHint?: string;
+  openingEvidence?: string;
+  context: string;
+  confidence: CandidateConfidence;
+  selectedByDefault: boolean;
 }
 
 type ResultDateStatus =
@@ -42,9 +80,45 @@ type ResultDateStatus =
   | 'old'
   | 'unknown';
 
+type SearchPlatform = 'INSTAGRAM' | 'FACEBOOK' | 'BOTH';
+
 interface ResultDateInfo {
   status: ResultDateStatus;
   label: string;
+}
+
+function suggestBusinessName(
+  result: GoogleSearchResult,
+): string {
+  const title =
+    result.titleNoFormatting ??
+    result.title ??
+    '';
+
+  const resultText = [
+    title,
+    result.contentNoFormatting,
+    result.content,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const mention = resultText.match(
+    /@([a-zA-Z0-9._]+)/,
+  );
+
+  if (mention?.[1]) {
+    return mention[1];
+  }
+
+  return title
+    .replace(
+      /\s*[-|–]\s*(Instagram|Facebook).*$/i,
+      '',
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
 }
 
 const turkishMonths: Record<string, number> = {
@@ -224,7 +298,24 @@ const API_URL =
 const PSE_SCRIPT_ID =
   'google-pse-script';
 
+const RESULTS_PER_PAGE = 10;
+
 export default function SearchDiscoveryPage() {
+  const [discoveryTab, setDiscoveryTab] =
+    React.useState<'SOCIAL' | 'MAPS'>('SOCIAL');
+  const [searchPlatform, setSearchPlatform] =
+    React.useState<SearchPlatform>('INSTAGRAM');
+
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [expandedResultUrl, setExpandedResultUrl] =
+    React.useState<string | null>(null);
+  const [savingCandidateKey, setSavingCandidateKey] =
+    React.useState<string | null>(null);
+  const [savedCandidateKeys, setSavedCandidateKeys] =
+    React.useState<string[]>([]);
+  const [mapsScanning, setMapsScanning] = React.useState(false);
+  const [mapCandidates, setMapCandidates] =
+    React.useState<GoogleMapCandidate[]>([]);
   const [keywords, setKeywords] =
     React.useState<SearchKeyword[]>([]);
 
@@ -264,6 +355,39 @@ export default function SearchDiscoveryPage() {
       ResolvedBusinessMatch
     >
   >({});
+
+  const [
+    businessNameInputs,
+    setBusinessNameInputs,
+  ] = React.useState<
+    Record<string, string>
+  >({});
+
+  const [
+    locationHintInputs,
+    setLocationHintInputs,
+  ] = React.useState<
+    Record<string, string>
+  >({});
+
+  const [
+    captionInputs,
+    setCaptionInputs,
+  ] = React.useState<
+    Record<string, string>
+  >({});
+
+  const [
+    captionCandidates,
+    setCaptionCandidates,
+  ] = React.useState<
+    Record<string, CaptionCandidate[]>
+  >({});
+
+  const [
+    analyzingUrl,
+    setAnalyzingUrl,
+  ] = React.useState<string | null>(null);
 
   const [
     deletingKeywordId,
@@ -459,7 +583,7 @@ export default function SearchDiscoveryPage() {
   const loadKeywords =
     React.useCallback(async () => {
       try {
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${API_URL}/search-keywords`,
         );
 
@@ -525,7 +649,7 @@ export default function SearchDiscoveryPage() {
     }
 
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/search-keywords`,
         {
           method: 'POST',
@@ -598,7 +722,7 @@ export default function SearchDiscoveryPage() {
     try {
       setDeletingKeywordId(keyword.id);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/search-keywords/${keyword.id}`,
         {
           method: 'DELETE',
@@ -624,6 +748,10 @@ export default function SearchDiscoveryPage() {
         setResults([]);
         setBusinessMatches({});
         setSelectedMatches({});
+        setBusinessNameInputs({});
+        setLocationHintInputs({});
+        setCaptionInputs({});
+        setCaptionCandidates({});
       }
 
       await loadKeywords();
@@ -663,23 +791,268 @@ export default function SearchDiscoveryPage() {
       return;
     }
 
+    const siteQuery =
+      searchPlatform === 'INSTAGRAM'
+        ? 'site:instagram.com'
+        : searchPlatform === 'FACEBOOK'
+          ? 'site:facebook.com'
+          : '(site:instagram.com OR site:facebook.com)';
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 30);
+    const afterDate = cutoffDate.toISOString().slice(0, 10);
+
     const query =
-      `site:instagram.com ${selectedKeyword}`;
+      `${siteQuery} ${selectedKeyword} after:${afterDate}`;
 
     setResults([]);
     setBusinessMatches({});
     setSelectedMatches({});
+    setBusinessNameInputs({});
+    setLocationHintInputs({});
+    setCaptionInputs({});
+    setCaptionCandidates({});
+    setCurrentPage(1);
+    setExpandedResultUrl(null);
 
     searchElement.execute(query);
+  };
+
+  const analyzeCaption = async (
+    result: GoogleSearchResult,
+  ) => {
+    const caption =
+      (
+        captionInputs[result.url] ??
+        result.contentNoFormatting ??
+        result.content ??
+        ''
+      ).trim();
+
+    if (!caption) {
+      setMessage({
+        text:
+          'Analiz etmek için post açıklamasını girin.',
+        severity: 'error',
+      });
+
+      return;
+    }
+
+    try {
+      setAnalyzingUrl(result.url);
+
+      const response = await authenticatedFetch(
+        `${API_URL}/analyzer/caption`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            caption,
+          }),
+        },
+      );
+
+      const responseBody =
+        await response
+          .json()
+          .catch(() => null);
+
+      if (!response.ok) {
+        const errorMessage =
+          Array.isArray(
+            responseBody?.message,
+          )
+            ? responseBody.message.join(
+                ' ',
+              )
+            : responseBody?.message ??
+              'Post açıklaması analiz edilemedi.';
+
+        throw new Error(
+          errorMessage,
+        );
+      }
+
+      const candidates =
+        responseBody as
+          CaptionCandidate[];
+
+      setCaptionCandidates(
+        (currentCandidates) => ({
+          ...currentCandidates,
+          [result.url]: candidates,
+        }),
+      );
+
+      const firstSuggestedCandidate =
+        candidates.find(
+          (candidate) =>
+            candidate.selectedByDefault,
+        );
+
+      if (firstSuggestedCandidate) {
+        setBusinessNameInputs(
+          (currentInputs) => ({
+            ...currentInputs,
+            [result.url]:
+              firstSuggestedCandidate.businessName,
+          }),
+        );
+
+        setLocationHintInputs(
+          (currentInputs) => ({
+            ...currentInputs,
+            [result.url]:
+              firstSuggestedCandidate.locationHint ??
+              '',
+          }),
+        );
+      }
+
+      setMessage({
+        text: candidates.length
+          ? `${candidates.length} aday bulundu.`
+          : 'Post açıklamasında işletme adayı bulunamadı.',
+        severity: candidates.length
+          ? 'success'
+          : 'error',
+      });
+    } catch (error) {
+      setMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Post açıklaması analiz edilemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setAnalyzingUrl(null);
+    }
+  };
+
+  const useCaptionCandidate = (
+    result: GoogleSearchResult,
+    candidate: CaptionCandidate,
+  ) => {
+    setBusinessNameInputs(
+      (currentInputs) => ({
+        ...currentInputs,
+        [result.url]:
+          candidate.businessName,
+      }),
+    );
+
+    setLocationHintInputs(
+      (currentInputs) => ({
+        ...currentInputs,
+        [result.url]:
+          candidate.locationHint ?? '',
+      }),
+    );
+
+    setBusinessMatches(
+      (currentMatches) => ({
+        ...currentMatches,
+        [result.url]: [],
+      }),
+    );
+
+    setSelectedMatches(
+      (currentMatches) => {
+        const nextMatches = {
+          ...currentMatches,
+        };
+
+        delete nextMatches[result.url];
+
+        return nextMatches;
+      },
+    );
+  };
+
+  const saveCandidate = async (
+    key: string,
+    payload: Record<string, unknown>,
+  ) => {
+    try {
+      setSavingCandidateKey(key);
+      const response = await authenticatedFetch(`${API_URL}/businesses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(responseBody?.message ?? 'Aday kaydedilemedi.');
+      }
+      setSavedCandidateKeys((current) =>
+        current.includes(key) ? current : [...current, key],
+      );
+      setMessage({ text: 'Aday kaydedildi ve rapora eklendi.', severity: 'success' });
+    } catch (error) {
+      setMessage({
+        text: error instanceof Error ? error.message : 'Aday kaydedilemedi.',
+        severity: 'error',
+      });
+    } finally {
+      setSavingCandidateKey(null);
+    }
+  };
+
+  const runGoogleMapsScan = async () => {
+    try {
+      setMapsScanning(true);
+      const response = await authenticatedFetch(`${API_URL}/google/new-businesses`);
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.message ?? 'Google Maps taraması başlatılamadı.');
+      }
+      setMapCandidates((body?.newPlaces ?? []) as GoogleMapCandidate[]);
+      setMessage({
+        text: body?.baselineCreated
+          ? 'İlk tarama referans liste olarak kaydedildi.'
+          : `${body?.newPlaceCount ?? 0} yeni aday bulundu.`,
+        severity: 'success',
+      });
+    } catch (error) {
+      setMessage({
+        text: error instanceof Error ? error.message : 'Google Maps taraması başarısız.',
+        severity: 'error',
+      });
+    } finally {
+      setMapsScanning(false);
+    }
   };
 
   const resolveBusiness = async (
     result: GoogleSearchResult,
   ) => {
+    const businessName =
+      (
+        businessNameInputs[
+          result.url
+        ] ??
+        suggestBusinessName(result)
+      ).trim();
+
+    if (!businessName) {
+      setMessage({
+        text:
+          'Google Places araması için işletme adını girin.',
+        severity: 'error',
+      });
+
+      return;
+    }
+
     try {
       setResolvingUrl(result.url);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/google/resolve-business`,
         {
           method: 'POST',
@@ -688,17 +1061,14 @@ export default function SearchDiscoveryPage() {
               'application/json',
           },
           body: JSON.stringify({
-            title:
-              result
-                .titleNoFormatting ??
-              result.title ??
-              result.url,
-            instagramUrl:
-              result.url,
-            snippet:
-              result
-                .contentNoFormatting ??
-              result.content,
+            businessName,
+            sourceUrl: result.url,
+            locationHint:
+              locationHintInputs[
+                result.url
+              ]?.trim() ||
+              undefined,
+            city: 'İstanbul',
           }),
         },
       );
@@ -780,6 +1150,22 @@ export default function SearchDiscoveryPage() {
     [results],
   );
 
+  const pageCount = Math.max(
+    1,
+    Math.ceil(visibleResults.length / RESULTS_PER_PAGE),
+  );
+
+  const paginatedResults = React.useMemo(() => {
+    const start = (currentPage - 1) * RESULTS_PER_PAGE;
+    return visibleResults.slice(start, start + RESULTS_PER_PAGE);
+  }, [currentPage, visibleResults]);
+
+  React.useEffect(() => {
+    if (currentPage > pageCount) {
+      setCurrentPage(pageCount);
+    }
+  }, [currentPage, pageCount]);
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -795,12 +1181,27 @@ export default function SearchDiscoveryPage() {
         <Typography
           color="text.secondary"
         >
-          Google üzerinden Instagram
+          Google üzerinden Instagram ve Facebook
           işletme profillerini bulun,
           inceleyin ve aday olarak
           kaydedin.
         </Typography>
       </Box>
+
+      <Paper variant="outlined" sx={{ px: 2 }}>
+        <Tabs
+          value={discoveryTab}
+          onChange={(_event, value: 'SOCIAL' | 'MAPS') =>
+            setDiscoveryTab(value)
+          }
+        >
+          <Tab value="SOCIAL" label="Sosyal Medya" />
+          <Tab value="MAPS" label="Google Maps" />
+        </Tabs>
+      </Paper>
+
+      {discoveryTab === 'SOCIAL' && (
+        <>
 
       <Paper
         variant="outlined"
@@ -815,6 +1216,21 @@ export default function SearchDiscoveryPage() {
           >
             Anahtar kelime
           </Typography>
+
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={searchPlatform}
+            onChange={(_event, value: SearchPlatform | null) => {
+              if (value) {
+                setSearchPlatform(value);
+              }
+            }}
+          >
+            <ToggleButton value="INSTAGRAM">Instagram</ToggleButton>
+            <ToggleButton value="FACEBOOK">Facebook</ToggleButton>
+            <ToggleButton value="BOTH">Her ikisi</ToggleButton>
+          </ToggleButtonGroup>
 
           <Stack
             direction={{
@@ -930,8 +1346,16 @@ export default function SearchDiscoveryPage() {
             "gcse-searchresults-only"
           data-gname=
             "salesRadarSearch"
+          data-resultsetsize=
+            "filtered_cse"
         />
       </Paper>
+
+      <Alert severity="info">
+        Google sonuç penceresinin altındaki sayfa numaralarını veya
+        “Sonraki” bağlantısını kullanın. Açtığınız her sayfadaki yeni
+        sonuçlar aşağıdaki aday listesine otomatik olarak eklenir.
+      </Alert>
 
       {results.length > 0 && (
         <Stack spacing={2}>
@@ -954,7 +1378,7 @@ export default function SearchDiscoveryPage() {
             gösteriliyor.
           </Typography>
 
-          {visibleResults.map(
+          {paginatedResults.map(
             (result) => (
               <Paper
                 key={result.url}
@@ -979,17 +1403,6 @@ export default function SearchDiscoveryPage() {
                       result.url}
                   </Link>
 
-                  <Typography
-                    variant="body2"
-                    color=
-                      "text.secondary"
-                  >
-                    {result
-                      .contentNoFormatting ??
-                      result.content ??
-                      'Açıklama bulunamadı.'}
-                  </Typography>
-
                   <Chip
                     size="small"
                     label={
@@ -1012,13 +1425,280 @@ export default function SearchDiscoveryPage() {
                     }}
                   />
 
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      display: '-webkit-box',
+                      WebkitBoxOrient: 'vertical',
+                      WebkitLineClamp: 2,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {result.contentNoFormatting ??
+                      result.content ??
+                      'Açıklama bulunamadı.'}
+                  </Typography>
+
+                  <Box>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setExpandedResultUrl((current) =>
+                          current === result.url ? null : result.url,
+                        );
+                      }}
+                    >
+                      {expandedResultUrl === result.url
+                        ? 'Detayları kapat'
+                        : 'İncele'}
+                    </Button>
+                  </Box>
+
+                  <Collapse
+                    in={expandedResultUrl === result.url}
+                    unmountOnExit
+                  >
+                    <Stack spacing={1.5} sx={{ pt: 1 }}>
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={4}
+                    size="small"
+                    label="Post açıklaması"
+                    value={
+                      captionInputs[
+                        result.url
+                      ] ??
+                      result
+                        .contentNoFormatting ??
+                      result.content ??
+                      ''
+                    }
+                    helperText=
+                      "Sosyal medya gönderisinin tam açıklamasını buraya yapıştırın."
+                    onChange={(event) => {
+                      setCaptionInputs(
+                        (currentInputs) => ({
+                          ...currentInputs,
+                          [result.url]:
+                            event.target.value,
+                        }),
+                      );
+                    }}
+                  />
+
+                  <Box>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={
+                        analyzingUrl ===
+                        result.url
+                      }
+                      onClick={() => {
+                        void analyzeCaption(
+                          result,
+                        );
+                      }}
+                    >
+                      {analyzingUrl ===
+                      result.url
+                        ? 'Açıklama analiz ediliyor'
+                        : 'Bilgileri analiz et'}
+                    </Button>
+                  </Box>
+
+                  {(captionCandidates[
+                    result.url
+                  ]?.length ?? 0) >
+                    0 && (
+                    <Stack spacing={1}>
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          fontWeight: 700,
+                        }}
+                      >
+                        Açıklamada bulunan
+                        adaylar
+                      </Typography>
+
+                      {captionCandidates[
+                        result.url
+                      ].map((candidate) => (
+                        <Paper
+                          key={candidate.id}
+                          variant="outlined"
+                          sx={{
+                            p: 1.5,
+                          }}
+                        >
+                          <Stack
+                            spacing={1}
+                          >
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              useFlexGap
+                              sx={{
+                                flexWrap:
+                                  'wrap',
+                                alignItems:
+                                  'center',
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontWeight:
+                                    600,
+                                }}
+                              >
+                                @{
+                                  candidate.businessName
+                                }
+                              </Typography>
+
+                              <Chip
+                                size="small"
+                                label={
+                                  candidate.confidence ===
+                                  'HIGH'
+                                    ? 'Yüksek güven'
+                                    : candidate.confidence ===
+                                        'MEDIUM'
+                                      ? 'Orta güven'
+                                      : 'Düşük güven'
+                                }
+                                color={
+                                  candidate.confidence ===
+                                  'HIGH'
+                                    ? 'success'
+                                    : candidate.confidence ===
+                                        'MEDIUM'
+                                      ? 'warning'
+                                      : 'default'
+                                }
+                                variant="outlined"
+                              />
+
+                              {candidate.selectedByDefault && (
+                                <Chip
+                                  size="small"
+                                  label=
+                                    "Önerilen"
+                                  color="primary"
+                                />
+                              )}
+                            </Stack>
+
+                            <Typography
+                              variant="body2"
+                              color=
+                                "text.secondary"
+                            >
+                              Konum:{' '}
+                              {candidate.locationHint ??
+                                'Bulunamadı'}
+                            </Typography>
+
+                            {candidate.openingEvidence && (
+                              <Typography
+                                variant="body2"
+                                color=
+                                  "text.secondary"
+                              >
+                                Sinyal:{' '}
+                                {
+                                  candidate.openingEvidence
+                                }
+                              </Typography>
+                            )}
+
+                            <Box>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  useCaptionCandidate(
+                                    result,
+                                    candidate,
+                                  );
+                                }}
+                              >
+                                Bu adayı kullan
+                              </Button>
+                            </Box>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )}
+
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label=
+                      "Google Places'ta aranacak işletme adı"
+                    value={
+                      businessNameInputs[
+                        result.url
+                      ] ??
+                      suggestBusinessName(
+                        result,
+                      )
+                    }
+                    helperText=
+                      "İşletme adını kontrol edin ve gerekirse düzeltin."
+                    onChange={(event) => {
+                      setBusinessNameInputs(
+                        (currentInputs) => ({
+                          ...currentInputs,
+                          [result.url]:
+                            event.target.value,
+                        }),
+                      );
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Konum ipucu"
+                    value={
+                      locationHintInputs[
+                        result.url
+                      ] ?? ''
+                    }
+                    helperText=
+                      "İlçe, mahalle veya adres bilgisini kontrol edin."
+                    onChange={(event) => {
+                      setLocationHintInputs(
+                        (currentInputs) => ({
+                          ...currentInputs,
+                          [result.url]:
+                            event.target.value,
+                        }),
+                      );
+                    }}
+                  />
+
                   <Box>
                     <Button
                       size="small"
                       variant="outlined"
                       disabled={
                         resolvingUrl ===
-                        result.url
+                          result.url ||
+                        !(
+                          businessNameInputs[
+                            result.url
+                          ] ??
+                          suggestBusinessName(
+                            result,
+                          )
+                        ).trim()
                       }
                       startIcon={
                         resolvingUrl ===
@@ -1041,7 +1721,7 @@ export default function SearchDiscoveryPage() {
                       {resolvingUrl ===
                       result.url
                         ? 'İşletme aranıyor'
-                        : 'İşletme bilgilerini bul'}
+                        : "Google Places'ta ara"}
                     </Button>
                   </Box>
 
@@ -1167,9 +1847,168 @@ export default function SearchDiscoveryPage() {
                       })}
                     </Stack>
                   )}
+
+                  <Stack spacing={0.5} sx={{ alignItems: 'flex-start' }}>
+                    <Button
+                      variant="contained"
+                      disabled={
+                        savedCandidateKeys.includes(result.url) ||
+                        savingCandidateKey === result.url ||
+                        !hasPermission('BUSINESS_CREATE') ||
+                        !(businessNameInputs[result.url] ??
+                          selectedMatches[result.url]?.name ??
+                          suggestBusinessName(result)).trim()
+                      }
+                      onClick={() => {
+                        const match = selectedMatches[result.url];
+                        const isFacebook = (() => {
+                          try {
+                            return new URL(result.url).hostname.includes('facebook.com');
+                          } catch {
+                            return false;
+                          }
+                        })();
+
+                        void saveCandidate(result.url, {
+                          name:
+                            match?.name ??
+                            businessNameInputs[result.url] ??
+                            suggestBusinessName(result),
+                          address:
+                            match?.address ??
+                            locationHintInputs[result.url] ??
+                            undefined,
+                          phone: match?.phone,
+                          googlePlaceId: match?.placeId,
+                          googleMapsUrl: match?.googleMapsUrl,
+                          ...(isFacebook
+                            ? { facebookUrl: result.url }
+                            : { instagramUrl: result.url }),
+                          discoverySource: isFacebook
+                            ? 'FACEBOOK'
+                            : 'INSTAGRAM',
+                        });
+                      }}
+                    >
+                      {savedCandidateKeys.includes(result.url)
+                        ? 'Aday kaydedildi'
+                        : 'Aday olarak kaydet'}
+                    </Button>
+
+                    {!selectedMatches[result.url] && (
+                      <Typography variant="caption" color="text.secondary">
+                        Google Places eşleşmesi seçilmeden de kaydedilebilir;
+                        eksik alanlar daha sonra tamamlanabilir.
+                      </Typography>
+                    )}
+                  </Stack>
+                    </Stack>
+                  </Collapse>
                 </Stack>
               </Paper>
             ),
+          )}
+
+          {pageCount > 1 && (
+            <Pagination
+              count={pageCount}
+              page={currentPage}
+              color="primary"
+              onChange={(_event, page) => {
+                setCurrentPage(page);
+                setExpandedResultUrl(null);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              sx={{ alignSelf: 'center', pt: 1 }}
+            />
+          )}
+        </Stack>
+      )}
+
+        </>
+      )}
+
+      {discoveryTab === 'MAPS' && (
+        <Stack spacing={2}>
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Stack spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Haftalık Google Maps taraması
+              </Typography>
+              <Typography color="text.secondary">
+                Önceki taramada bulunmayan yeni işletmeleri keşfedin ve
+                yalnızca uygun gördüklerinizi aday havuzuna kaydedin.
+              </Typography>
+              <Button
+                variant="contained"
+                disabled={mapsScanning}
+                onClick={() => void runGoogleMapsScan()}
+              >
+                {mapsScanning ? 'İstanbul taranıyor...' : 'Taramayı başlat'}
+              </Button>
+            </Stack>
+          </Paper>
+
+          {mapCandidates.length === 0 ? (
+            <Alert severity="info">
+              Henüz listelenecek yeni Google Maps adayı bulunmuyor.
+            </Alert>
+          ) : (
+            mapCandidates.map(({ district, place }) => {
+              const key = `maps:${place.id}`;
+              const saved = savedCandidateKeys.includes(key);
+              return (
+                <Paper key={place.id} variant="outlined" sx={{ p: 2 }}>
+                  <Stack spacing={1}>
+                    <Typography sx={{ fontWeight: 700 }}>
+                      {place.displayName?.text ?? 'İsimsiz işletme'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {place.formattedAddress ?? district}
+                    </Typography>
+                    <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                      <Chip size="small" label={district} />
+                      {place.nationalPhoneNumber && (
+                        <Chip size="small" label={place.nationalPhoneNumber} variant="outlined" />
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      {place.googleMapsUri && (
+                        <Button
+                          component="a"
+                          href={place.googleMapsUri}
+                          target="_blank"
+                          size="small"
+                        >
+                          Haritada aç
+                        </Button>
+                      )}
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={
+                          saved ||
+                          savingCandidateKey === key ||
+                          !hasPermission('BUSINESS_CREATE')
+                        }
+                        onClick={() =>
+                          void saveCandidate(key, {
+                            name: place.displayName?.text ?? 'İsimsiz işletme',
+                            address: place.formattedAddress,
+                            phone: place.nationalPhoneNumber,
+                            googlePlaceId: place.id,
+                            googleMapsUrl: place.googleMapsUri,
+                            discoverySource: 'GOOGLE_MAPS',
+                          })
+                        }
+                      >
+                        {saved ? 'Aday kaydedildi' : 'Aday olarak kaydet'}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              );
+            })
           )}
         </Stack>
       )}

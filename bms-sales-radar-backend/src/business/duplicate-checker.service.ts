@@ -53,9 +53,17 @@ export class DuplicateCheckerService{
     instagramUrl?:string,
     name?:string,
     address?:string,
+    googlePlaceId?: string,
   ):Promise<Business | null >{
         const normalizedPhone=this.normalizePhone(phone);
         const normalizedInstagram=this.normalizeInstagram(instagramUrl);
+
+        if (googlePlaceId) {
+            const business = await this.businessRepository.findOneBy({ googlePlaceId });
+            if (business) {
+                return business;
+            }
+        }
         
         if(normalizedPhone){
             const business=await this.businessRepository.findOneBy({phone:normalizedPhone});

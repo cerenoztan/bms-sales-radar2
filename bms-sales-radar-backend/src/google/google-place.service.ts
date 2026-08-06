@@ -10,7 +10,14 @@ import { AxiosError } from 'axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 
-import { GooglePlaceEntity } from './entities/google-place.entity';
+import {
+  GooglePlaceComparisonStatus,
+  GooglePlaceEntity,
+} from './entities/google-place.entity';
+import {
+  GoogleScanRunEntity,
+  GoogleScanStatus,
+} from './entities/google-scan-run.entity';
 import { GooglePlace } from './interfaces/google-place.interface';
 import {
   ISTANBUL_DISTRICTS,
@@ -53,6 +60,9 @@ export class GoogleService {
 
     @InjectRepository(GooglePlaceEntity)
     private readonly googlePlaceRepository:Repository<GooglePlaceEntity>,
+
+    @InjectRepository(GoogleScanRunEntity)
+    private readonly googleScanRunRepository: Repository<GoogleScanRunEntity>,
   ) {}
 
   async searchBusinessesInIstanbul(): Promise<
@@ -156,6 +166,7 @@ export class GoogleService {
                 'places.id',
                 'places.displayName',
                 'places.formattedAddress',
+                'places.nationalPhoneNumber',
                 'places.googleMapsUri',
                 'nextPageToken',
               ].join(','),
@@ -214,78 +225,160 @@ export class GoogleService {
     };
   }
   async findNewBusinesses() {
-  const districtResults =
-    await this.searchBusinessesInIstanbul();
+    const scanRun = await this.googleScanRunRepository.save(
+      this.googleScanRunRepository.create({
+        status: GoogleScanStatus.RUNNING,
+      }),
+    );
 
-  const successfulResults = districtResults.filter(
-    (result) => result.success,
-  );
+    try {
+      const previousRun = await this.googleScanRunRepository.findOne({
+        where: { status: GoogleScanStatus.COMPLETED },
+        order: { id: 'DESC' },
+      });
 
-  const currentPlaces = successfulResults.flatMap((result) =>
-    result.places.map((place) => ({
-      district: result.district,
-      place,
-    })),
-  );
+      const districtResults = await this.searchBusinessesInIstanbul();
+      const successfulResults = districtResults.filter(
+        (result) => result.success,
+      );
 
-  const uniqueCurrentPlaces = Array.from(
-    new Map(
-      currentPlaces.map((item) => [
-        item.place.id,
-        item,
-      ]),
-    ).values(),
-  );
+      const currentPlaces = successfulResults.flatMap((result) =>
+        result.places.map((place) => ({
+          district: result.district,
+          place,
+        })),
+      );
 
-  if (uniqueCurrentPlaces.length === 0) {
-    return {
-      totalFound: 0,
-      newPlaceCount: 0,
-      newPlaces: [],
-    };
+      const uniqueCurrentPlaces = Array.from(
+        new Map(
+          currentPlaces.map((item) => [item.place.id, item]),
+        ).values(),
+      );
+
+      const currentPlaceIds = uniqueCurrentPlaces.map(
+        (item) => item.place.id,
+      );
+
+      const existingPlaces = currentPlaceIds.length
+        ? await this.googlePlaceRepository.find({
+            where: { placeId: In(currentPlaceIds) },
+          })
+        : [];
+
+      const existingById = new Map(
+        existingPlaces.map((place) => [place.placeId, place]),
+      );
+
+      const now = new Date();
+      const placesToSave: GooglePlaceEntity[] = [];
+      const firstObservedPlaces: typeof uniqueCurrentPlaces = [];
+      const confirmedPlaces: GooglePlaceEntity[] = [];
+
+      for (const { district, place } of uniqueCurrentPlaces) {
+        const existing = existingById.get(place.id);
+
+        if (!existing) {
+          firstObservedPlaces.push({ district, place });
+          placesToSave.push(
+            this.googlePlaceRepository.create({
+              placeId: place.id,
+              district,
+              displayName: place.displayName?.text,
+              formattedAddress: place.formattedAddress,
+              nationalPhoneNumber: place.nationalPhoneNumber,
+              googleMapsUri: place.googleMapsUri,
+              firstSeenAt: now,
+              lastSeenAt: now,
+              firstSeenRunId: scanRun.id,
+              lastSeenRunId: scanRun.id,
+              seenCount: 1,
+              comparisonStatus: previousRun
+                ? GooglePlaceComparisonStatus.CANDIDATE
+                : GooglePlaceComparisonStatus.BASELINE,
+            }),
+          );
+          continue;
+        }
+
+        const appearedInPreviousRun =
+          previousRun && existing.lastSeenRunId === previousRun.id;
+
+        existing.district = district;
+        existing.displayName = place.displayName?.text;
+        existing.formattedAddress = place.formattedAddress;
+        existing.nationalPhoneNumber = place.nationalPhoneNumber;
+        existing.googleMapsUri = place.googleMapsUri;
+        existing.lastSeenAt = now;
+        existing.lastSeenRunId = scanRun.id;
+        existing.seenCount += 1;
+
+        if (
+          existing.comparisonStatus ===
+            GooglePlaceComparisonStatus.CANDIDATE &&
+          appearedInPreviousRun
+        ) {
+          existing.comparisonStatus =
+            GooglePlaceComparisonStatus.CONFIRMED;
+          existing.confirmedAt = now;
+          existing.confirmedRunId = scanRun.id;
+          confirmedPlaces.push(existing);
+        }
+
+        placesToSave.push(existing);
+      }
+
+      if (placesToSave.length) {
+        await this.googlePlaceRepository.save(placesToSave);
+      }
+
+      scanRun.status = GoogleScanStatus.COMPLETED;
+      scanRun.totalFound = uniqueCurrentPlaces.length;
+      scanRun.firstObservedCount = firstObservedPlaces.length;
+      scanRun.confirmedCount = confirmedPlaces.length;
+      scanRun.successfulDistrictCount = successfulResults.length;
+      scanRun.failedDistrictCount =
+        districtResults.length - successfulResults.length;
+      scanRun.completedAt = now;
+      await this.googleScanRunRepository.save(scanRun);
+
+      return {
+        scanRunId: scanRun.id,
+        baselineCreated: !previousRun,
+        totalFound: uniqueCurrentPlaces.length,
+        firstObservedCount: firstObservedPlaces.length,
+        confirmedCount: confirmedPlaces.length,
+        newPlaceCount: previousRun ? firstObservedPlaces.length : 0,
+        newPlaces: previousRun ? firstObservedPlaces : [],
+      };
+    } catch (error) {
+      scanRun.status = GoogleScanStatus.FAILED;
+      scanRun.completedAt = new Date();
+      scanRun.errorMessage =
+        error instanceof Error ? error.message : String(error);
+      await this.googleScanRunRepository.save(scanRun);
+      throw error;
+    }
   }
 
-  const currentPlaceIds = uniqueCurrentPlaces.map(
-    (item) => item.place.id,
-  );
-
-  const existingPlaces =
-    await this.googlePlaceRepository.find({
-      where: {
-        placeId: In(currentPlaceIds),
-      },
-      select: {
-        placeId: true,
-      },
+  async findLatestNewCandidates(): Promise<GooglePlaceEntity[]> {
+    const latestRun = await this.googleScanRunRepository.findOne({
+      where: { status: GoogleScanStatus.COMPLETED },
+      order: { id: 'DESC' },
     });
 
-  const existingPlaceIds = new Set(
-    existingPlaces.map((place) => place.placeId),
-  );
+    if (!latestRun) {
+      return [];
+    }
 
-  const newPlaces = uniqueCurrentPlaces.filter(
-    (item) => !existingPlaceIds.has(item.place.id),
-  );
-
-  await this.googlePlaceRepository.upsert(
-    uniqueCurrentPlaces.map(({ district, place }) => ({
-      placeId: place.id,
-      district,
-      displayName: place.displayName?.text,
-      formattedAddress: place.formattedAddress,
-      googleMapsUri: place.googleMapsUri,
-      lastSeenAt: new Date(),
-    })),
-    {
-      conflictPaths: ['placeId'],
-      skipUpdateIfNoValuesChanged: true,
-    },
-  );
-
-  return {
-    totalFound: uniqueCurrentPlaces.length,
-    newPlaceCount: newPlaces.length,
-    newPlaces,
-  };
-}
+    return this.googlePlaceRepository.find({
+      where: {
+        comparisonStatus: GooglePlaceComparisonStatus.CANDIDATE,
+        firstSeenRunId: latestRun.id,
+      },
+      order: {
+        district: 'ASC',
+        displayName: 'ASC',
+      },
+    });
+  }
 }

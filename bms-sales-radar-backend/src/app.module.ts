@@ -20,6 +20,7 @@ import { PermissionsModule } from './permission/permissions.module';
 import { Permission } from './permission/permission.entity';
 import { SearchKeyword } from './search-keyword/search-keyword.entity';
 import { SearchKeywordModule } from './search-keyword/search-keyword.module';
+import { GoogleScanRunEntity } from './google/entities/google-scan-run.entity';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { SearchKeywordModule } from './search-keyword/search-keyword.module';
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
       entities: [Business,Source,User,GooglePlaceEntity,Role,Permission,
-        SearchKeyword, 
+      SearchKeyword,GoogleScanRunEntity,
       ],
       synchronize: true,
     }),
@@ -45,6 +46,7 @@ import { SearchKeywordModule } from './search-keyword/search-keyword.module';
     RolesModule,
     PermissionsModule,
     SearchKeywordModule,
+
     
   ],
 })

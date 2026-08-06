@@ -3,8 +3,13 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryColumn,
-  UpdateDateColumn,
 } from 'typeorm';
+
+export enum GooglePlaceComparisonStatus {
+  BASELINE = 'BASELINE',
+  CANDIDATE = 'CANDIDATE',
+  CONFIRMED = 'CONFIRMED',
+}
 
 @Entity('google_places')
 export class GooglePlaceEntity {
@@ -21,11 +26,35 @@ export class GooglePlaceEntity {
   formattedAddress?: string;
 
   @Column({ nullable: true })
+  nationalPhoneNumber?: string;
+
+  @Column({ nullable: true })
   googleMapsUri?: string;
 
   @CreateDateColumn()
   firstSeenAt!: Date;
 
-  @UpdateDateColumn()
+  @Column({ type: 'datetime' })
   lastSeenAt!: Date;
+
+  @Column({ type: 'integer' })
+  firstSeenRunId!: number;
+
+  @Column({ type: 'integer' })
+  lastSeenRunId!: number;
+
+  @Column({ type: 'integer', default: 1 })
+  seenCount!: number;
+
+  @Column({
+    type: 'text',
+    default: GooglePlaceComparisonStatus.BASELINE,
+  })
+  comparisonStatus!: GooglePlaceComparisonStatus;
+
+  @Column({ type: 'datetime', nullable: true })
+  confirmedAt?: Date;
+
+  @Column({ type: 'integer', nullable: true })
+  confirmedRunId?: number;
 }

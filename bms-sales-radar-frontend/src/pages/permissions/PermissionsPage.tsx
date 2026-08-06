@@ -28,6 +28,10 @@ import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
+import {
+  authenticatedFetch,
+  hasPermission,
+} from '../../auth/authStorage';
 
 const API_URL =
   import.meta.env.VITE_API_URL ??
@@ -198,6 +202,7 @@ function groupPermissions(
 }
 
 export default function PermissionsPage() {
+  const canUpdatePermissions = hasPermission('PERMISSION_UPDATE');
   const [roles, setRoles] =
     React.useState<Role[]>([]);
 
@@ -251,6 +256,9 @@ export default function PermissionsPage() {
       (role) => role.id === selectedRoleId,
     ) ?? null;
 
+  const selectedRoleIsSystem =
+    selectedRole?.name === 'Sistem Yöneticisi';
+
   const hasChanges =
     JSON.stringify(
       [...draftPermissionIds].sort(
@@ -273,8 +281,8 @@ export default function PermissionsPage() {
           rolesResponse,
           permissionsResponse,
         ] = await Promise.all([
-          fetch(`${API_URL}/roles`),
-          fetch(`${API_URL}/permissions`),
+          authenticatedFetch(`${API_URL}/roles`),
+          authenticatedFetch(`${API_URL}/permissions`),
         ]);
 
         const loadedRoles =
@@ -325,7 +333,7 @@ export default function PermissionsPage() {
           setRolePermissionsLoading(true);
           setPageError('');
 
-          const response = await fetch(
+          const response = await authenticatedFetch(
             `${API_URL}/roles/${roleId}/permissions`,
           );
 
@@ -464,7 +472,7 @@ export default function PermissionsPage() {
     try {
       setSaving(true);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/roles/${selectedRoleId}/permissions`,
         {
           method: 'PUT',
@@ -572,7 +580,7 @@ export default function PermissionsPage() {
             variant="outlined"
             onClick={handleReset}
             disabled={
-              !hasChanges || saving
+              !canUpdatePermissions || selectedRoleIsSystem || !hasChanges || saving
             }
           >
             Değişiklikleri Geri Al
@@ -588,6 +596,8 @@ export default function PermissionsPage() {
             }
             disabled={
               selectedRoleId === null ||
+              !canUpdatePermissions ||
+              selectedRoleIsSystem ||
               !hasChanges ||
               saving ||
               rolePermissionsLoading
@@ -897,6 +907,8 @@ export default function PermissionsPage() {
                                   allSelected
                                 }
                                 disabled={
+                                  !canUpdatePermissions ||
+                                  selectedRoleIsSystem ||
                                   selectedRoleId ===
                                   null
                                 }
@@ -940,6 +952,10 @@ export default function PermissionsPage() {
                                 }
                                 control={
                                   <Checkbox
+                                    disabled={
+                                      !canUpdatePermissions ||
+                                      selectedRoleIsSystem
+                                    }
                                     checked={draftPermissionIds.includes(
                                       permission.id,
                                     )}

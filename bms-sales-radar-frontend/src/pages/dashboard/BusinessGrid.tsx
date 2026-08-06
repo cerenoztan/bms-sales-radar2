@@ -18,6 +18,7 @@ import type {
   GridColDef,
   GridRowId,
 } from '@mui/x-data-grid';
+import { authenticatedFetch } from '../../auth/authStorage';
 
 const API_URL = 'http://localhost:3000';
 
@@ -121,7 +122,7 @@ export default function BusinessGrid() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_URL}/businesses`);
+      const response = await authenticatedFetch(`${API_URL}/businesses`);
 
       if (!response.ok) {
         throw new Error(

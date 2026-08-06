@@ -16,6 +16,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import RadarIcon from '@mui/icons-material/Radar';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
+import { hasPermission } from '../../auth/authStorage';
 
 const drawerWidth = 260;
 
@@ -24,36 +25,43 @@ const menuItems = [
     label: 'Ana Sayfa',
     path: '/dashboard',
     icon: <DashboardIcon />,
+    permission: 'DASHBOARD_VIEW',
   },
   {
   label: 'Aday Keşfi',
   path: '/dashboard/search',
   icon: <SearchIcon />,
+  permission: 'SEARCH_DISCOVERY_VIEW',
   },
   {
     label: 'Kullanıcılar',
     path: '/dashboard/users',
     icon: <PeopleIcon />,
+    permission: 'USER_VIEW',
   },
   {
     label: 'Rol Tanımlama',
     path: '/dashboard/roles',
     icon: <AdminPanelSettingsIcon />,
+    permission: 'ROLE_VIEW',
   },
   {
     label: "Yetkilendirme",
     path: '/dashboard/permissions',
     icon: <AdminPanelSettingsIcon/>,
+    permission: 'PERMISSION_VIEW',
   },
   {
     label: 'Raporlar',
     path: '/dashboard/reports',
     icon: <AssessmentIcon />,
+    permission: 'REPORT_VIEW',
   },
   {
     label: 'Ayarlar',
     path: '/dashboard/settings',
     icon: <SettingsIcon />,
+    permission: undefined,
   },
 
 ];
@@ -134,11 +142,15 @@ export default function Sidebar() {
         {menuItems.map((item) => {
           const selected =
             location.pathname === item.path;
+          const allowed = item.permission
+            ? hasPermission(item.permission)
+            : true;
 
           return (
             <ListItemButton
               key={item.path}
               selected={selected}
+              disabled={!allowed}
               onClick={() => navigate(item.path)}
               sx={{
                 mb: 0.75,

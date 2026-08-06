@@ -15,6 +15,10 @@ import { styled } from '@mui/material/styles';
 import RadarIcon from '@mui/icons-material/Radar';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  'http://localhost:3000';
+
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -69,6 +73,18 @@ export default function SignIn() {
   const [isLoading, setIsLoading] =
     React.useState(false);
 
+  const [setupRequired, setSetupRequired] =
+    React.useState(false);
+
+  React.useEffect(() => {
+    void fetch(`${API_URL}/auth/setup-status`)
+      .then((response) => response.json())
+      .then((data: { setupRequired?: boolean }) => {
+        setSetupRequired(Boolean(data.setupRequired));
+      })
+      .catch(() => undefined);
+  }, []);
+
   const validateInputs = (
     email: string,
     password: string,
@@ -119,6 +135,10 @@ export default function SignIn() {
       formData.get('password') ?? '',
     );
 
+    const fullName = String(
+      formData.get('fullName') ?? '',
+    ).trim();
+
     const remember =
       formData.get('remember') === 'on';
 
@@ -131,12 +151,40 @@ export default function SignIn() {
       return;
     }
 
+    if (setupRequired && !fullName) {
+      setLoginError('Ad soyad alanı zorunludur.');
+      return;
+    }
+
     setLoginError('');
     setIsLoading(true);
 
     try {
+      if (setupRequired) {
+        const setupResponse = await fetch(
+          `${API_URL}/auth/bootstrap`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fullName,
+              email,
+              password,
+            }),
+          },
+        );
+
+        if (!setupResponse.ok) {
+          const setupData = await setupResponse.json().catch(() => null);
+          throw new Error(
+            setupData?.message ??
+              'Sistem yöneticisi oluşturulamadı.',
+          );
+        }
+      }
+
       const response = await fetch(
-        'http://localhost:3000/auth/login',
+        `${API_URL}/auth/login`,
         {
           method: 'POST',
           headers: {
@@ -243,7 +291,9 @@ export default function SignIn() {
                 'clamp(2rem, 10vw, 2.15rem)',
             }}
           >
-            Giriş yap
+            {setupRequired
+              ? 'İlk kurulumu tamamla'
+              : 'Giriş yap'}
           </Typography>
 
           <Box
@@ -257,6 +307,19 @@ export default function SignIn() {
               gap: 2,
             }}
           >
+            {setupRequired && (
+              <FormControl>
+                <FormLabel htmlFor="fullName">Ad Soyad</FormLabel>
+                <TextField
+                  id="fullName"
+                  name="fullName"
+                  autoComplete="name"
+                  required
+                  fullWidth
+                />
+              </FormControl>
+            )}
+
             <FormControl>
               <FormLabel htmlFor="email">
                 E-posta
@@ -294,7 +357,9 @@ export default function SignIn() {
                 type="password"
                 name="password"
                 placeholder="••••••"
-                autoComplete="current-password"
+                autoComplete={
+                  setupRequired ? 'new-password' : 'current-password'
+                }
                 required
                 fullWidth
                 variant="outlined"
@@ -338,11 +403,15 @@ export default function SignIn() {
               }}
             >
               {isLoading
-                ? 'Giriş yapılıyor...'
-                : 'Giriş yap'}
+                ? setupRequired
+                  ? 'Yönetici oluşturuluyor...'
+                  : 'Giriş yapılıyor...'
+                : setupRequired
+                  ? 'Sistem Yöneticisini Oluştur'
+                  : 'Giriş yap'}
             </Button>
 
-            <Link
+            {!setupRequired && <Link
             component="button"
             type="button"
             variant="body2"
@@ -350,7 +419,7 @@ export default function SignIn() {
             onClick={() => navigate('/forgot-password')}
             >
             Şifrenizi mi unuttunuz?
-            </Link>
+            </Link>}
           </Box>
         </Card>
       </SignInContainer>

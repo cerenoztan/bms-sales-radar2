@@ -15,6 +15,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { authenticatedFetch } from '../../auth/authStorage';
 
 const API_URL = 'http://localhost:3000';
 
@@ -94,7 +95,7 @@ export default function CreateUserDialog({
         setLoadingRoles(true);
         setError('');
 
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${API_URL}/roles`,
         );
 
@@ -183,7 +184,7 @@ export default function CreateUserDialog({
           'accessToken',
         );
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/users`,
         {
           method: 'POST',

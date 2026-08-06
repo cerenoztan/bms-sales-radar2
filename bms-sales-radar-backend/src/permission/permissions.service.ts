@@ -84,6 +84,22 @@ export class PermissionsService
         key: 'SEARCH_DISCOVERY_VIEW',
       },
       {
+        name: 'İşletmeleri görüntüleme',
+        key: 'BUSINESS_VIEW',
+      },
+      {
+        name: 'İşletme oluşturma',
+        key: 'BUSINESS_CREATE',
+      },
+      {
+        name: 'İşletme güncelleme',
+        key: 'BUSINESS_UPDATE',
+      },
+      {
+        name: 'İşletme silme',
+        key: 'BUSINESS_DELETE',
+      },
+      {
         name: 'Kullanıcıları görüntüleme',
         key: 'USER_VIEW',
       },
@@ -151,6 +167,17 @@ export class PermissionsService
         permission,
       );
     }
+
+    const systemRole = await this.roleRepository.findOne({
+      where: { name: 'Sistem Yöneticisi' },
+      relations: { permissions: true },
+    });
+
+    if (systemRole) {
+      systemRole.isActive = true;
+      systemRole.permissions = await this.permissionRepository.find();
+      await this.roleRepository.save(systemRole);
+    }
   }
 
   async updateRolePermissions(
@@ -171,6 +198,11 @@ export class PermissionsService
       throw new NotFoundException(
         'Rol bulunamadı.',
       );
+    }
+
+    if (role.name === 'Sistem Yöneticisi') {
+      role.permissions = await this.permissionRepository.find();
+      return this.roleRepository.save(role);
     }
 
     const uniquePermissionIds = [

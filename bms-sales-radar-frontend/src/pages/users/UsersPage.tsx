@@ -15,6 +15,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 
 import CreateUserDialog from './CreateUserDialog';
+import { hasPermission } from '../../auth/authStorage';
 
 const API_URL = 'http://localhost:3000';
 
@@ -268,12 +269,9 @@ export default function UsersPage() {
 
         <Button
           variant="contained"
-          startIcon={
-            <PersonAddOutlinedIcon />
-          }
-          onClick={() =>
-            setCreateDialogOpen(true)
-          }
+          startIcon={<PersonAddOutlinedIcon />}
+          disabled={!hasPermission('USER_CREATE')}
+          onClick={() => setCreateDialogOpen(true)}
         >
           Yeni Kullanıcı
         </Button>

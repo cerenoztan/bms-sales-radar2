@@ -10,6 +10,8 @@ import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +19,49 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
   ) {}
+
+  async getSetupStatus() {
+    return {
+      setupRequired: !(await this.usersService.hasUsers()),
+    };
+  }
+
+  async bootstrap(dto: CreateUserDto) {
+    if (await this.usersService.hasUsers()) {
+      throw new BadRequestException(
+        'İlk sistem yöneticisi daha önce oluşturulmuş.',
+      );
+    }
+
+    return this.usersService.create({
+      ...dto,
+      roleId: undefined,
+      isActive: true,
+    });
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.usersService.findAuthUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı.');
+    }
+
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      jobTitle: user.jobTitle,
+      role: user.role
+        ? { id: user.role.id, name: user.role.name }
+        : null,
+    };
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    await this.usersService.update(userId, dto);
+    return this.getProfile(userId);
+  }
 
   async login(loginDto: LoginDto) {
     const email = loginDto.email.trim().toLowerCase();

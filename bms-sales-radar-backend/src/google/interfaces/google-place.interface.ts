@@ -8,6 +8,7 @@ export interface GooglePlace {
   };
 
   formattedAddress?:string;
+  nationalPhoneNumber?: string;
   googleMapsUri?: string;
 }
 
@@ -23,4 +24,5 @@ export interface ResolvedBusinessMatch {
   name: string;
   address?: string;
   googleMapsUrl?: string;
+  phone?: string;
 }

@@ -7,13 +7,18 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/require-permissions.decorator';
 
 @Controller('roles')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RolesController {
   constructor(
     private readonly rolesService:
@@ -21,6 +26,7 @@ export class RolesController {
   ) {}
 
   @Post()
+  @RequirePermissions('ROLE_CREATE')
   create(
     @Body()
     dto: CreateRoleDto,
@@ -29,11 +35,13 @@ export class RolesController {
   }
 
   @Get()
+  @RequirePermissions('ROLE_VIEW')
   findAll() {
     return this.rolesService.findAll();
   }
 
   @Get(':id')
+  @RequirePermissions('ROLE_VIEW')
   findOne(
     @Param('id', ParseIntPipe)
     id: number,
@@ -42,6 +50,7 @@ export class RolesController {
   }
 
   @Patch(':id')
+  @RequirePermissions('ROLE_UPDATE')
   update(
     @Param('id', ParseIntPipe)
     id: number,
@@ -55,6 +64,7 @@ export class RolesController {
   }
 
   @Delete(':id')
+  @RequirePermissions('ROLE_DELETE')
   async remove(
     @Param('id', ParseIntPipe)
     id: number,

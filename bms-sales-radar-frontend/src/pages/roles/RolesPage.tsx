@@ -23,6 +23,10 @@ import Typography from '@mui/material/Typography';
 
 import CreateRoleDialog from './CreateRoleDialog';
 import type { CreateRolePayload } from './CreateRoleDialog';
+import {
+  authenticatedFetch,
+  hasPermission,
+} from '../../auth/authStorage';
 
 const API_URL = 'http://localhost:3000';
 
@@ -97,7 +101,7 @@ export default function RolesPage() {
       try {
         setLoading(true);
 
-        const response = await fetch(
+        const response = await authenticatedFetch(
           `${API_URL}/roles`,
         );
 
@@ -131,7 +135,7 @@ export default function RolesPage() {
     try {
       setCreating(true);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/roles`,
         {
           method: 'POST',
@@ -189,7 +193,7 @@ export default function RolesPage() {
     try {
       setUpdating(true);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/roles/${editingRole.id}`,
         {
           method: 'PATCH',
@@ -247,7 +251,7 @@ export default function RolesPage() {
     try {
       setDeleting(true);
 
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_URL}/roles/${deletingRole.id}`,
         {
           method: 'DELETE',
@@ -322,9 +326,8 @@ export default function RolesPage() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() =>
-            setCreateOpen(true)
-          }
+          disabled={!hasPermission('ROLE_CREATE')}
+          onClick={() => setCreateOpen(true)}
         >
           Yeni Rol
         </Button>
@@ -409,14 +412,12 @@ export default function RolesPage() {
                     <Button
                       size="small"
                       variant="outlined"
-                      startIcon={
-                        <EditOutlinedIcon />
+                      startIcon={<EditOutlinedIcon />}
+                      disabled={
+                        !hasPermission('ROLE_UPDATE') ||
+                        role.name === 'Sistem Yöneticisi'
                       }
-                      onClick={() =>
-                        setEditingRole({
-                          ...role,
-                        })
-                      }
+                      onClick={() => setEditingRole({ ...role })}
                     >
                       Düzenle
                     </Button>
@@ -425,12 +426,12 @@ export default function RolesPage() {
                       size="small"
                       variant="outlined"
                       color="error"
-                      startIcon={
-                        <DeleteIcon />
+                      startIcon={<DeleteIcon />}
+                      disabled={
+                        !hasPermission('ROLE_DELETE') ||
+                        role.name === 'Sistem Yöneticisi'
                       }
-                      onClick={() =>
-                        setDeletingRole(role)
-                      }
+                      onClick={() => setDeletingRole(role)}
                     >
                       Sil
                     </Button>

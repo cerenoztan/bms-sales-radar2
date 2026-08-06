@@ -85,6 +85,12 @@ export class RolesService {
   ): Promise<Role> {
     const role = await this.findOne(id);
 
+    if (role.name === 'Sistem Yöneticisi') {
+      throw new ConflictException(
+        'Sistem Yöneticisi rolü değiştirilemez.',
+      );
+    }
+
     if (dto.name !== undefined) {
       const name = dto.name.trim();
 
@@ -120,6 +126,12 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException(
         'Rol bulunamadı.',
+      );
+    }
+
+    if (role.name === 'Sistem Yöneticisi') {
+      throw new ConflictException(
+        'Sistem Yöneticisi rolü silinemez.',
       );
     }
 

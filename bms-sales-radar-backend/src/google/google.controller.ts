@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 
 import { BusinessResolverService } from './business-resolver.service';
@@ -15,8 +16,13 @@ import {
 import { GoogleSearchService } from './google-search.service';
 import { ResolvedBusinessMatch } from './interfaces/google-place.interface';
 import { GoogleSearchResult } from './interfaces/google-search.interface';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/require-permissions.decorator';
 
 @Controller('google')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('SEARCH_DISCOVERY_VIEW')
 export class GoogleController {
   constructor(
     private readonly googleService:
@@ -49,9 +55,10 @@ export class GoogleController {
   ): Promise<ResolvedBusinessMatch[]> {
     return this.businessResolverService
       .resolveBusiness(
-        dto.title,
-        dto.instagramUrl,
-        dto.snippet,
+        dto.businessName,
+        dto.sourceUrl,
+        dto.locationHint,
+        dto.city,
       );
   }
 

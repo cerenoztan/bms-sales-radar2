@@ -14,11 +14,33 @@ export class CreateBusinessDto {
   @IsNotEmpty()
   name!: string;
 
+  @IsOptional()
   @IsString()
   address?: string;
 
   @IsOptional()
+  @IsUrl()
   instagramUrl?: string;
+
+  @IsOptional()
+  @IsUrl()
+  facebookUrl?: string;
+
+  @IsOptional()
+  @IsUrl()
+  googleMapsUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  googlePlaceId?: string;
+
+  @IsOptional()
+  @IsString()
+  discoverySource?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 
   @IsOptional()
   @IsPhoneNumber('TR')

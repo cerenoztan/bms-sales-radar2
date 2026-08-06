@@ -11,6 +11,9 @@ import PermissionRoute from '../../auth/PermissionRoute';
 import UsersPage from '../users/UsersPage';
 import RolesPage from '../roles/RolesPage';
 import PermissionsPage from '../permissions/PermissionsPage';
+import ReportsPage from '../reports/ReportsPage';
+import SettingsPage from '../settings/SettingsPage';
+import AuthenticatedRoute from '../../auth/AuthenticatedRoute';
 
 import Sidebar from './Sidebar';
 import BusinessGrid from './BusinessGrid';
@@ -88,6 +91,24 @@ export default function Dashboard() {
               <PermissionRoute permission="PERMISSION_VIEW">
                 <PermissionsPage />
               </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="reports"
+            element={
+              <PermissionRoute permission="REPORT_VIEW">
+                <ReportsPage />
+              </PermissionRoute>
+            }
+          />
+
+          <Route
+            path="settings"
+            element={
+              <AuthenticatedRoute>
+                <SettingsPage />
+              </AuthenticatedRoute>
             }
           />
 

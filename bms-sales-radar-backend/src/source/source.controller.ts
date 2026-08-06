@@ -6,12 +6,18 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { SaveSearchResultDto } from './dto/save-search-result.dto';
 import { CreateSourceDto } from './dto/create-source.dto';
 import { SourceService } from './source.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/require-permissions.decorator';
 
 @Controller('sources')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions('SEARCH_DISCOVERY_VIEW')
 export class SourceController {
   constructor(
     private readonly sourceService: SourceService,

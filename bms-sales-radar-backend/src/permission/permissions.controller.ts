@@ -5,12 +5,17 @@ import {
   Param,
   ParseIntPipe,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 
 import { PermissionsService } from './permissions.service';
 import { UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/require-permissions.decorator';
 
 @Controller()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PermissionsController {
   constructor(
     private readonly permissionsService:
@@ -18,11 +23,13 @@ export class PermissionsController {
   ) {}
 
   @Get('permissions')
+  @RequirePermissions('PERMISSION_VIEW')
   findAll() {
     return this.permissionsService.findAll();
   }
 
   @Get('roles/:roleId/permissions')
+  @RequirePermissions('PERMISSION_VIEW')
   findByRole(
     @Param('roleId', ParseIntPipe)
     roleId: number,
@@ -34,6 +41,7 @@ export class PermissionsController {
  
 
   @Put('roles/:roleId/permissions')
+  @RequirePermissions('PERMISSION_UPDATE')
   updateRolePermissions(
     @Param('roleId', ParseIntPipe)
     roleId: number,
