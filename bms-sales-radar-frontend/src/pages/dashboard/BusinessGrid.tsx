@@ -28,6 +28,7 @@ interface BusinessRow {
   address?: string | null;
   phone?: string | null;
   instagramUrl?: string | null;
+  facebookUrl?: string | null;
   score?: number;
   salesPriority?: string;
   status: string;
@@ -179,26 +180,53 @@ export default function BusinessGrid() {
       valueFormatter: (value) => value ?? '-',
     },
     {
-      field: 'instagramUrl',
-      headerName: 'Instagram',
+      field: 'socialMedia',
+      headerName: 'Sosyal Medya',
       flex: 1.2,
-      minWidth: 150,
+      minWidth: 180,
       sortable: false,
       renderCell: (params) => {
-        if (!params.value) {
+        const socialProfiles = [
+          params.row.instagramUrl
+            ? {
+                label: 'Instagram',
+                url: params.row.instagramUrl,
+              }
+            : null,
+          params.row.facebookUrl
+            ? {
+                label: 'Facebook',
+                url: params.row.facebookUrl,
+              }
+            : null,
+        ].filter(
+          (
+            profile,
+          ): profile is {
+            label: string;
+            url: string;
+          } => profile !== null,
+        );
+
+        if (!socialProfiles.length) {
           return '-';
         }
 
         return (
-          <Link
-            href={params.value}
-            target="_blank"
-            rel="noopener noreferrer"
-            underline="hover"
-            onClick={(event) => event.stopPropagation()}
-          >
-            Profili aç
-          </Link>
+          <Stack direction="row" spacing={1}>
+            {socialProfiles.map((profile) => (
+              <Link
+                key={profile.label}
+                href={profile.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                underline="hover"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {profile.label}
+              </Link>
+            ))}
+          </Stack>
         );
       },
     },

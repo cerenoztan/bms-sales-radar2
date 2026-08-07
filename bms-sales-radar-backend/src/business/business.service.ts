@@ -30,13 +30,16 @@ export class BusinessService {
 
      const phone=this.duplicateChecker.normalizePhone(createBusinessDto.phone,);
      const instagramUrl=this.duplicateChecker.normalizeInstagram(createBusinessDto.instagramUrl,);
+     const facebookUrl=this.duplicateChecker.normalizeFacebook(createBusinessDto.facebookUrl,);
 
      const duplicate=await this.duplicateChecker.findDuplicate(
        phone,
        instagramUrl,
+       facebookUrl,
        createBusinessDto.name,
        createBusinessDto.address,
        createBusinessDto.googlePlaceId,
+       createBusinessDto.discoverySource,
      );
 
      if(duplicate){
@@ -44,7 +47,7 @@ export class BusinessService {
         // use phone if exists otherwise merge the new phone
         phone:phone ?? duplicate.phone,
         instagramUrl:instagramUrl??duplicate.instagramUrl,
-        facebookUrl:createBusinessDto.facebookUrl ?? duplicate.facebookUrl,
+        facebookUrl:facebookUrl ?? duplicate.facebookUrl,
         googleMapsUrl:createBusinessDto.googleMapsUrl ?? duplicate.googleMapsUrl,
         googlePlaceId:createBusinessDto.googlePlaceId ?? duplicate.googlePlaceId,
         discoverySource:createBusinessDto.discoverySource ?? duplicate.discoverySource,
@@ -55,7 +58,7 @@ export class BusinessService {
      }
 
     //creating a Business object from DTO
-    const business= this.businessRepository.create({...createBusinessDto,phone,instagramUrl});
+    const business= this.businessRepository.create({...createBusinessDto,phone,instagramUrl,facebookUrl});
 
     const scoredBusiness=this.scoreService.createScoredBusiness(business);
     //saving the object to the database

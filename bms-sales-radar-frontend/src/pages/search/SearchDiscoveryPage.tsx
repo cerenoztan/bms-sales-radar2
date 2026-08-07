@@ -87,6 +87,39 @@ interface ResultDateInfo {
   label: string;
 }
 
+function getSocialResultUrl(resultUrl: string): string {
+  try {
+    const parsedUrl = new URL(resultUrl);
+    const hostname = parsedUrl.hostname
+      .toLocaleLowerCase('en-US')
+      .replace(/^www\./, '');
+
+    if (hostname === 'google.com' && parsedUrl.pathname === '/url') {
+      const targetUrl = parsedUrl.searchParams.get('q');
+
+      if (targetUrl) {
+        return new URL(targetUrl).toString();
+      }
+    }
+  } catch {
+    return resultUrl;
+  }
+
+  return resultUrl;
+}
+
+function isFacebookUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname
+      .toLocaleLowerCase('en-US')
+      .replace(/^(www|m)\./, '');
+
+    return hostname === 'facebook.com';
+  } catch {
+    return false;
+  }
+}
+
 function suggestBusinessName(
   result: GoogleSearchResult,
 ): string {
@@ -1861,13 +1894,8 @@ export default function SearchDiscoveryPage() {
                       }
                       onClick={() => {
                         const match = selectedMatches[result.url];
-                        const isFacebook = (() => {
-                          try {
-                            return new URL(result.url).hostname.includes('facebook.com');
-                          } catch {
-                            return false;
-                          }
-                        })();
+                        const socialUrl = getSocialResultUrl(result.url);
+                        const isFacebook = isFacebookUrl(socialUrl);
 
                         void saveCandidate(result.url, {
                           name:
@@ -1882,8 +1910,8 @@ export default function SearchDiscoveryPage() {
                           googlePlaceId: match?.placeId,
                           googleMapsUrl: match?.googleMapsUrl,
                           ...(isFacebook
-                            ? { facebookUrl: result.url }
-                            : { instagramUrl: result.url }),
+                            ? { facebookUrl: socialUrl }
+                            : { instagramUrl: socialUrl }),
                           discoverySource: isFacebook
                             ? 'FACEBOOK'
                             : 'INSTAGRAM',
