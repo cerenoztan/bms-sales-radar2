@@ -99,10 +99,42 @@ export class DuplicateCheckerService{
     }
   }
 
+  normalizeLinkedin(linkedinUrl?: string): string | undefined {
+    if (!linkedinUrl) {
+      return undefined;
+    }
+
+    try {
+      const parsedUrl = new URL(linkedinUrl.trim());
+      const hostname = parsedUrl.hostname
+        .toLocaleLowerCase('en-US')
+        .replace(/^www\./, '');
+
+      if (hostname !== 'linkedin.com') {
+        return linkedinUrl.trim();
+      }
+
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      if (!pathParts.length) {
+        return 'https://linkedin.com';
+      }
+
+      if (pathParts[0] === 'company' && pathParts[1]) {
+        return `https://linkedin.com/company/${pathParts[1].toLocaleLowerCase('en-US')}`;
+      }
+
+      return `https://linkedin.com/${pathParts.join('/')}`;
+    } catch {
+      return linkedinUrl.trim();
+    }
+  }
+
   async findDuplicate(
     phone?:string,
     instagramUrl?:string,
     facebookUrl?: string,
+    linkedinUrl?: string,
+    jobPostingUrl?: string,
     name?:string,
     address?:string,
     googlePlaceId?: string,
@@ -111,22 +143,57 @@ export class DuplicateCheckerService{
         const normalizedPhone=this.normalizePhone(phone);
         const normalizedInstagram=this.normalizeInstagram(instagramUrl);
         const normalizedFacebook=this.normalizeFacebook(facebookUrl);
+        const normalizedLinkedin=this.normalizeLinkedin(linkedinUrl);
+        const normalizedJobPosting=jobPostingUrl?.trim();
+        const normalizedName=this.normalizeText(name);
 
         if(normalizedInstagram){
-            const business=await this.businessRepository.findOneBy({instagramUrl:normalizedInstagram});
+            const businesses=await this.businessRepository.findBy({instagramUrl:normalizedInstagram});
+            const business=businesses.find(
+              (candidate) => this.normalizeText(candidate.name) === normalizedName,
+            );
             if(business){
                 return business;
             }
         }
 
         if(normalizedFacebook){
-            const business=await this.businessRepository.findOneBy({facebookUrl:normalizedFacebook});
+            const businesses=await this.businessRepository.findBy({facebookUrl:normalizedFacebook});
+            const business=businesses.find(
+              (candidate) => this.normalizeText(candidate.name) === normalizedName,
+            );
             if(business){
                 return business;
             }
         }
 
-        if (discoverySource === 'INSTAGRAM' || discoverySource === 'FACEBOOK') {
+        if(normalizedLinkedin){
+            const businesses=await this.businessRepository.findBy({linkedinUrl:normalizedLinkedin});
+            const business=businesses.find(
+              (candidate) => this.normalizeText(candidate.name) === normalizedName,
+            );
+            if(business){
+                return business;
+            }
+        }
+
+        if(normalizedJobPosting){
+            const businesses=await this.businessRepository.findBy({jobPostingUrl:normalizedJobPosting});
+            const business=businesses.find(
+              (candidate) => this.normalizeText(candidate.name) === normalizedName,
+            );
+            if(business){
+                return business;
+            }
+        }
+
+        if (
+          discoverySource === 'INSTAGRAM' ||
+          discoverySource === 'FACEBOOK' ||
+          discoverySource === 'LINKEDIN' ||
+          discoverySource === 'KARIYER_NET' ||
+          discoverySource === 'SAHIBINDEN'
+        ) {
             return null;
         }
 

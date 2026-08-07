@@ -27,6 +27,14 @@ export class UpdateBusinessDto {
 
   @IsOptional()
   @IsUrl()
+  linkedinUrl?: string;
+
+  @IsOptional()
+  @IsUrl()
+  jobPostingUrl?: string;
+
+  @IsOptional()
+  @IsUrl()
   googleMapsUrl?: string;
 
   @IsOptional()

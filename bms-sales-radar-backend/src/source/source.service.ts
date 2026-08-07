@@ -119,13 +119,19 @@ export class SourceService{
   }
 
   if (dto.platform === 'LINKEDIN') {
+    const isLinkedinPost =
+      pathParts[0] === 'posts' && Boolean(pathParts[1]);
+    const isLinkedinFeedUpdate =
+      pathParts[0] === 'feed' &&
+      pathParts[1] === 'update' &&
+      Boolean(pathParts[2]);
+
     if (
       hostname !== 'linkedin.com' ||
-      pathParts[0] !== 'company' ||
-      !pathParts[1]
+      (!isLinkedinPost && !isLinkedinFeedUpdate)
     ) {
       throw new BadRequestException(
-        'Yalnızca LinkedIn şirket sayfaları kaydedilebilir.',
+        'Yalnızca LinkedIn gönderi adresleri kaydedilebilir.',
       );
     }
   }
@@ -214,5 +220,4 @@ export class SourceService{
 //Repository → performs database operations on that table.
 //Service → contains the business logic and coordinates one or more repositories.
 //Controller → receives HTTP requests and calls the service.
-
 

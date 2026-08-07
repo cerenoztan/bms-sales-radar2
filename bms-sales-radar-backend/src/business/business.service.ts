@@ -31,11 +31,14 @@ export class BusinessService {
      const phone=this.duplicateChecker.normalizePhone(createBusinessDto.phone,);
      const instagramUrl=this.duplicateChecker.normalizeInstagram(createBusinessDto.instagramUrl,);
      const facebookUrl=this.duplicateChecker.normalizeFacebook(createBusinessDto.facebookUrl,);
+     const linkedinUrl=this.duplicateChecker.normalizeLinkedin(createBusinessDto.linkedinUrl,);
 
      const duplicate=await this.duplicateChecker.findDuplicate(
        phone,
        instagramUrl,
        facebookUrl,
+       linkedinUrl,
+       createBusinessDto.jobPostingUrl,
        createBusinessDto.name,
        createBusinessDto.address,
        createBusinessDto.googlePlaceId,
@@ -48,6 +51,8 @@ export class BusinessService {
         phone:phone ?? duplicate.phone,
         instagramUrl:instagramUrl??duplicate.instagramUrl,
         facebookUrl:facebookUrl ?? duplicate.facebookUrl,
+        linkedinUrl:linkedinUrl ?? duplicate.linkedinUrl,
+        jobPostingUrl:createBusinessDto.jobPostingUrl ?? duplicate.jobPostingUrl,
         googleMapsUrl:createBusinessDto.googleMapsUrl ?? duplicate.googleMapsUrl,
         googlePlaceId:createBusinessDto.googlePlaceId ?? duplicate.googlePlaceId,
         discoverySource:createBusinessDto.discoverySource ?? duplicate.discoverySource,
@@ -58,7 +63,7 @@ export class BusinessService {
      }
 
     //creating a Business object from DTO
-    const business= this.businessRepository.create({...createBusinessDto,phone,instagramUrl,facebookUrl});
+    const business= this.businessRepository.create({...createBusinessDto,phone,instagramUrl,facebookUrl,linkedinUrl});
 
     const scoredBusiness=this.scoreService.createScoredBusiness(business);
     //saving the object to the database

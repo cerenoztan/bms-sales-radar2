@@ -50,7 +50,12 @@ export class ScoreService{
         if(this.hasValue(business.phone)){
             score+=weights.phone;
         }
-        if(this.hasValue(business.instagramUrl)){
+        if(
+          this.hasValue(business.instagramUrl) ||
+          this.hasValue(business.facebookUrl) ||
+          this.hasValue(business.linkedinUrl) ||
+          this.hasValue(business.jobPostingUrl)
+        ){
             score+=weights.instagramUrl;
         }
         if(this.hasValue(business.address)){

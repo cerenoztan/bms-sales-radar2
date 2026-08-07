@@ -33,6 +33,12 @@ export class Business {
   facebookUrl?: string;
 
   @Column({ nullable: true })
+  linkedinUrl?: string;
+
+  @Column({ nullable: true })
+  jobPostingUrl?: string;
+
+  @Column({ nullable: true })
   googleMapsUrl?: string;
 
   @Column({ nullable: true, unique: true })

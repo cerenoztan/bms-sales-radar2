@@ -37,6 +37,11 @@ export class ExcelReportService {
         width: 30,
       },
       {
+        header: 'LinkedIn',
+        key: 'linkedinUrl',
+        width: 30,
+      },
+      {
         header: 'Sales Priority',
         key: 'salesPriority',
         width: 20,
@@ -53,6 +58,7 @@ export class ExcelReportService {
         address: business.address,
         phone: business.phone ?? '',
         instagramUrl: business.instagramUrl ?? '',
+        linkedinUrl: business.linkedinUrl ?? '',
         salesPriority: business.salesPriority,
       });
     });
@@ -170,7 +176,7 @@ export class ExcelReportService {
       views: [{ state: 'frozen', ySplit: 3 }],
     });
 
-    worksheet.mergeCells('A1:K1');
+    worksheet.mergeCells('A1:M1');
     worksheet.getCell('A1').value = 'Kaydedilen Adaylar';
     worksheet.getCell('A1').font = {
       bold: true,
@@ -184,14 +190,14 @@ export class ExcelReportService {
     };
     worksheet.getRow(1).height = 30;
 
-    worksheet.mergeCells('A2:K2');
+    worksheet.mergeCells('A2:M2');
     worksheet.getCell('A2').value =
       `${businesses.length} kaydedilmiş aday listelendi.`;
 
     const headers = [
       'İşletme Adı', 'Adres', 'Telefon', 'Durum', 'Skor',
-      'Keşif Kaynağı', 'Instagram', 'Facebook', 'Google Maps',
-      'Notlar', 'Kayıt Tarihi',
+      'Keşif Kaynağı', 'Instagram', 'Facebook', 'LinkedIn',
+      'İş İlanı', 'Google Maps', 'Notlar', 'Kayıt Tarihi',
     ];
     const headerRow = worksheet.getRow(3);
     headerRow.values = headers;
@@ -212,19 +218,22 @@ export class ExcelReportService {
         business.discoverySource ?? '',
         business.instagramUrl ?? '',
         business.facebookUrl ?? '',
+        business.linkedinUrl ?? '',
+        business.jobPostingUrl ?? '',
         business.googleMapsUrl ?? '',
         business.notes ?? '',
         business.createdAt,
       ]);
-      row.getCell(11).numFmt = 'dd.mm.yyyy hh:mm';
+      row.getCell(13).numFmt = 'dd.mm.yyyy hh:mm';
     }
 
     worksheet.columns = [
       { width: 30 }, { width: 48 }, { width: 18 }, { width: 20 },
       { width: 10 }, { width: 18 }, { width: 32 }, { width: 32 },
-      { width: 32 }, { width: 45 }, { width: 21 },
+      { width: 32 }, { width: 32 }, { width: 32 }, { width: 45 },
+      { width: 21 },
     ];
-    worksheet.autoFilter = { from: 'A3', to: 'K3' };
+    worksheet.autoFilter = { from: 'A3', to: 'M3' };
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);

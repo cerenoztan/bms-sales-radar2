@@ -80,7 +80,13 @@ type ResultDateStatus =
   | 'old'
   | 'unknown';
 
-type SearchPlatform = 'INSTAGRAM' | 'FACEBOOK' | 'BOTH';
+type DiscoveryPlatform =
+  | 'INSTAGRAM'
+  | 'FACEBOOK'
+  | 'LINKEDIN'
+  | 'KARIYER_NET'
+  | 'SAHIBINDEN';
+type SearchPlatform = DiscoveryPlatform | 'ALL';
 
 interface ResultDateInfo {
   status: ResultDateStatus;
@@ -108,16 +114,58 @@ function getSocialResultUrl(resultUrl: string): string {
   return resultUrl;
 }
 
-function isFacebookUrl(url: string): boolean {
+function getSocialPlatform(
+  url: string,
+  fallback: SearchPlatform,
+): DiscoveryPlatform {
   try {
     const hostname = new URL(url).hostname
       .toLocaleLowerCase('en-US')
       .replace(/^(www|m)\./, '');
 
-    return hostname === 'facebook.com';
+    if (hostname === 'facebook.com') {
+      return 'FACEBOOK';
+    }
+
+    if (hostname === 'linkedin.com') {
+      return 'LINKEDIN';
+    }
+
+    if (hostname === 'instagram.com') {
+      return 'INSTAGRAM';
+    }
+
+    if (hostname === 'kariyer.net') {
+      return 'KARIYER_NET';
+    }
+
+    if (hostname === 'sahibinden.com') {
+      return 'SAHIBINDEN';
+    }
   } catch {
-    return false;
+    // Seçilen platform aşağıda güvenli varsayılan olarak kullanılır.
   }
+
+  return fallback === 'ALL' ? 'INSTAGRAM' : fallback;
+}
+
+function getSocialUrlPayload(
+  platform: DiscoveryPlatform,
+  url: string,
+): Record<string, string> {
+  if (platform === 'FACEBOOK') {
+    return { facebookUrl: url };
+  }
+
+  if (platform === 'LINKEDIN') {
+    return { linkedinUrl: url };
+  }
+
+  if (platform === 'KARIYER_NET' || platform === 'SAHIBINDEN') {
+    return { jobPostingUrl: url };
+  }
+
+  return { instagramUrl: url };
 }
 
 function suggestBusinessName(
@@ -829,7 +877,13 @@ export default function SearchDiscoveryPage() {
         ? 'site:instagram.com'
         : searchPlatform === 'FACEBOOK'
           ? 'site:facebook.com'
-          : '(site:instagram.com OR site:facebook.com)';
+          : searchPlatform === 'LINKEDIN'
+            ? '(site:linkedin.com/posts OR site:linkedin.com/feed/update)'
+            : searchPlatform === 'KARIYER_NET'
+              ? 'site:kariyer.net/is-ilani'
+              : searchPlatform === 'SAHIBINDEN'
+                ? 'site:sahibinden.com/restoran-konaklama'
+                : '(site:instagram.com OR site:facebook.com OR site:linkedin.com/posts OR site:linkedin.com/feed/update OR site:kariyer.net/is-ilani OR site:sahibinden.com/restoran-konaklama)';
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 30);
@@ -1034,6 +1088,22 @@ export default function SearchDiscoveryPage() {
     } finally {
       setSavingCandidateKey(null);
     }
+  };
+
+  const saveCaptionCandidate = (
+    result: GoogleSearchResult,
+    candidate: CaptionCandidate,
+  ) => {
+    const socialUrl = getSocialResultUrl(result.url);
+    const platform = getSocialPlatform(socialUrl, searchPlatform);
+
+    return saveCandidate(`${result.url}:${candidate.id}`, {
+      name: candidate.businessName,
+      address: candidate.locationHint,
+      ...getSocialUrlPayload(platform, socialUrl),
+      discoverySource: platform,
+      notes: candidate.context || undefined,
+    });
   };
 
   const runGoogleMapsScan = async () => {
@@ -1262,7 +1332,10 @@ export default function SearchDiscoveryPage() {
           >
             <ToggleButton value="INSTAGRAM">Instagram</ToggleButton>
             <ToggleButton value="FACEBOOK">Facebook</ToggleButton>
-            <ToggleButton value="BOTH">Her ikisi</ToggleButton>
+            <ToggleButton value="LINKEDIN">LinkedIn</ToggleButton>
+            <ToggleButton value="KARIYER_NET">Kariyer.net</ToggleButton>
+            <ToggleButton value="SAHIBINDEN">Sahibinden</ToggleButton>
+            <ToggleButton value="ALL">Tümü</ToggleButton>
           </ToggleButtonGroup>
 
           <Stack
@@ -1650,18 +1723,45 @@ export default function SearchDiscoveryPage() {
                             )}
 
                             <Box>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => {
-                                  useCaptionCandidate(
-                                    result,
-                                    candidate,
-                                  );
-                                }}
-                              >
-                                Bu adayı kullan
-                              </Button>
+                              <Stack direction="row" spacing={1}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    useCaptionCandidate(
+                                      result,
+                                      candidate,
+                                    );
+                                  }}
+                                >
+                                  Bu adayı kullan
+                                </Button>
+
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disabled={
+                                    savingCandidateKey ===
+                                      `${result.url}:${candidate.id}` ||
+                                    savedCandidateKeys.includes(
+                                      `${result.url}:${candidate.id}`,
+                                    ) ||
+                                    !hasPermission('BUSINESS_CREATE')
+                                  }
+                                  onClick={() => {
+                                    void saveCaptionCandidate(
+                                      result,
+                                      candidate,
+                                    );
+                                  }}
+                                >
+                                  {savedCandidateKeys.includes(
+                                    `${result.url}:${candidate.id}`,
+                                  )
+                                    ? 'Kaydedildi'
+                                    : 'Adayı kaydet'}
+                                </Button>
+                              </Stack>
                             </Box>
                           </Stack>
                         </Paper>
@@ -1895,7 +1995,10 @@ export default function SearchDiscoveryPage() {
                       onClick={() => {
                         const match = selectedMatches[result.url];
                         const socialUrl = getSocialResultUrl(result.url);
-                        const isFacebook = isFacebookUrl(socialUrl);
+                        const platform = getSocialPlatform(
+                          socialUrl,
+                          searchPlatform,
+                        );
 
                         void saveCandidate(result.url, {
                           name:
@@ -1909,12 +2012,8 @@ export default function SearchDiscoveryPage() {
                           phone: match?.phone,
                           googlePlaceId: match?.placeId,
                           googleMapsUrl: match?.googleMapsUrl,
-                          ...(isFacebook
-                            ? { facebookUrl: socialUrl }
-                            : { instagramUrl: socialUrl }),
-                          discoverySource: isFacebook
-                            ? 'FACEBOOK'
-                            : 'INSTAGRAM',
+                          ...getSocialUrlPayload(platform, socialUrl),
+                          discoverySource: platform,
                         });
                       }}
                     >

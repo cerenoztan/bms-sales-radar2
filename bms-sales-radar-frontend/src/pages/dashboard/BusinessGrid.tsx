@@ -2,7 +2,6 @@ import * as React from 'react';
 
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
@@ -10,14 +9,9 @@ import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-
 import { DataGrid } from '@mui/x-data-grid';
 
-import type {
-  GridColDef,
-  GridRowId,
-} from '@mui/x-data-grid';
+import type { GridColDef } from '@mui/x-data-grid';
 import { authenticatedFetch } from '../../auth/authStorage';
 
 const API_URL = 'http://localhost:3000';
@@ -29,6 +23,8 @@ interface BusinessRow {
   phone?: string | null;
   instagramUrl?: string | null;
   facebookUrl?: string | null;
+  linkedinUrl?: string | null;
+  jobPostingUrl?: string | null;
   score?: number;
   salesPriority?: string;
   status: string;
@@ -110,9 +106,6 @@ export default function BusinessGrid() {
   const [rows, setRows] = React.useState<BusinessRow[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  const [selectedRowId, setSelectedRowId] =
-    React.useState<GridRowId | null>(null);
-
   const [snackbar, setSnackbar] = React.useState<SnackbarState>({
     open: false,
     message: '',
@@ -153,10 +146,6 @@ export default function BusinessGrid() {
   React.useEffect(() => {
     void loadBusinesses();
   }, [loadBusinesses]);
-
-  const handleEdit = (id: GridRowId) => {
-    alert(`${id} numaralı işletme düzenlenecek.`);
-  };
 
   const columns: GridColDef<BusinessRow>[] = [
     {
@@ -199,6 +188,12 @@ export default function BusinessGrid() {
                 url: params.row.facebookUrl,
               }
             : null,
+          params.row.linkedinUrl
+            ? {
+                label: 'LinkedIn',
+                url: params.row.linkedinUrl,
+              }
+            : null,
         ].filter(
           (
             profile,
@@ -229,6 +224,26 @@ export default function BusinessGrid() {
           </Stack>
         );
       },
+    },
+    {
+      field: 'jobPostingUrl',
+      headerName: 'İş İlanı',
+      minWidth: 120,
+      sortable: false,
+      renderCell: (params) =>
+        params.value ? (
+          <Link
+            href={params.value}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            onClick={(event) => event.stopPropagation()}
+          >
+            İlanı aç
+          </Link>
+        ) : (
+          '-'
+        ),
     },
     {
       field: 'score',
@@ -296,18 +311,6 @@ export default function BusinessGrid() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<EditOutlinedIcon />}
-          disabled={selectedRowId === null}
-          onClick={() => {
-            if (selectedRowId !== null) {
-              handleEdit(selectedRowId);
-            }
-          }}
-        >
-          Düzenle
-        </Button>
       </Stack>
 
       <Paper
@@ -324,9 +327,6 @@ export default function BusinessGrid() {
           rows={rows}
           columns={columns}
           loading={loading}
-          onRowClick={(params) => {
-            setSelectedRowId(params.id);
-          }}
           pageSizeOptions={[10, 25, 50]}
           initialState={{
             pagination: {
@@ -352,9 +352,6 @@ export default function BusinessGrid() {
               outline: 'none',
             },
 
-            '& .MuiDataGrid-row': {
-              cursor: 'pointer',
-            },
           }}
         />
       </Paper>

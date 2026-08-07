@@ -21,6 +21,7 @@ import { Permission } from './permission/permission.entity';
 import { SearchKeyword } from './search-keyword/search-keyword.entity';
 import { SearchKeywordModule } from './search-keyword/search-keyword.module';
 import { GoogleScanRunEntity } from './google/entities/google-scan-run.entity';
+import { AnalyzerModule } from './analyzer/analyzer.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { GoogleScanRunEntity } from './google/entities/google-scan-run.entity';
     RolesModule,
     PermissionsModule,
     SearchKeywordModule,
+    AnalyzerModule,
 
     
   ],
