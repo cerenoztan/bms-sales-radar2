@@ -36,6 +36,7 @@ interface SearchKeyword {
   id: number;
   keyword: string;
   isActive: boolean;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,11 +87,27 @@ type DiscoveryPlatform =
   | 'LINKEDIN'
   | 'KARIYER_NET'
   | 'SAHIBINDEN';
-type SearchPlatform = DiscoveryPlatform | 'ALL';
+
+const DISCOVERY_PLATFORMS: DiscoveryPlatform[] = [
+  'INSTAGRAM',
+  'FACEBOOK',
+  'LINKEDIN',
+  'KARIYER_NET',
+  'SAHIBINDEN',
+];
+
+const PLATFORM_SITE_QUERIES: Record<DiscoveryPlatform, string> = {
+  INSTAGRAM: 'site:instagram.com',
+  FACEBOOK: 'site:facebook.com',
+  LINKEDIN: '(site:linkedin.com/posts OR site:linkedin.com/feed/update)',
+  KARIYER_NET: 'site:kariyer.net/is-ilani',
+  SAHIBINDEN: 'site:sahibinden.com/restoran-konaklama',
+};
 
 interface ResultDateInfo {
   status: ResultDateStatus;
   label: string;
+  date?: string;
 }
 
 function getSocialResultUrl(resultUrl: string): string {
@@ -116,7 +133,7 @@ function getSocialResultUrl(resultUrl: string): string {
 
 function getSocialPlatform(
   url: string,
-  fallback: SearchPlatform,
+  fallback: DiscoveryPlatform[],
 ): DiscoveryPlatform {
   try {
     const hostname = new URL(url).hostname
@@ -146,7 +163,7 @@ function getSocialPlatform(
     // Seçilen platform aşağıda güvenli varsayılan olarak kullanılır.
   }
 
-  return fallback === 'ALL' ? 'INSTAGRAM' : fallback;
+  return fallback[0] ?? 'INSTAGRAM';
 }
 
 function getSocialUrlPayload(
@@ -282,6 +299,7 @@ function analyzeResultDate(
           ? 'recent'
           : 'old',
       label: relativeMatch[0],
+      date: resultDate.toISOString(),
     };
   }
 
@@ -316,6 +334,7 @@ function analyzeResultDate(
           ? 'recent'
           : 'old',
       label: absoluteMatch[0],
+      date: resultDate.toISOString(),
     };
   }
 
@@ -384,8 +403,8 @@ const RESULTS_PER_PAGE = 10;
 export default function SearchDiscoveryPage() {
   const [discoveryTab, setDiscoveryTab] =
     React.useState<'SOCIAL' | 'MAPS'>('SOCIAL');
-  const [searchPlatform, setSearchPlatform] =
-    React.useState<SearchPlatform>('INSTAGRAM');
+  const [searchPlatforms, setSearchPlatforms] =
+    React.useState<DiscoveryPlatform[]>(['INSTAGRAM']);
 
   const [currentPage, setCurrentPage] = React.useState(1);
   const [expandedResultUrl, setExpandedResultUrl] =
@@ -401,12 +420,14 @@ export default function SearchDiscoveryPage() {
     React.useState<SearchKeyword[]>([]);
 
   const [
-    selectedKeyword,
-    setSelectedKeyword,
-  ] = React.useState('');
+    selectedKeywords,
+    setSelectedKeywords,
+  ] = React.useState<string[]>([]);
 
   const [keywordInput, setKeywordInput] =
     React.useState('');
+  const [deletingKeywordId, setDeletingKeywordId] =
+    React.useState<number | null>(null);
     
   const [results, setResults] =
     React.useState<GoogleSearchResult[]>([]);
@@ -470,10 +491,6 @@ export default function SearchDiscoveryPage() {
     setAnalyzingUrl,
   ] = React.useState<string | null>(null);
 
-  const [
-    deletingKeywordId,
-    setDeletingKeywordId,
-  ] = React.useState<number | null>(null);
 
   const [message, setMessage] =
     React.useState<{
@@ -684,20 +701,20 @@ export default function SearchDiscoveryPage() {
             (item) => item.isActive,
           );
 
-        setSelectedKeyword(
-          (currentKeyword) => {
-            const currentStillExists =
-              data.some(
-                (item) =>
-                  item.isActive &&
-                  item.keyword ===
-                    currentKeyword,
-              );
+        setSelectedKeywords(
+          (currentKeywords) => {
+            const availableKeywords = new Set(
+              data.filter((item) => item.isActive).map((item) => item.keyword),
+            );
+            const remainingKeywords = currentKeywords.filter((keyword) =>
+              availableKeywords.has(keyword),
+            );
 
-            return currentStillExists
-              ? currentKeyword
+            return remainingKeywords.length
+              ? remainingKeywords
               : firstActiveKeyword
-                  ?.keyword ?? '';
+                ? [firstActiveKeyword.keyword]
+                : [];
           },
         );
       } catch (error) {
@@ -767,8 +784,10 @@ export default function SearchDiscoveryPage() {
       }
 
       setKeywordInput('');
-      setSelectedKeyword(
-        responseBody.keyword,
+      setSelectedKeywords((current) =>
+        current.includes(responseBody.keyword)
+          ? current
+          : [...current, responseBody.keyword],
       );
 
       await loadKeywords();
@@ -789,65 +808,29 @@ export default function SearchDiscoveryPage() {
     }
   };
 
-  const deleteKeyword = async (
-    keyword: SearchKeyword,
-  ) => {
+  const deleteKeyword = async (keyword: SearchKeyword) => {
+    if (keyword.isDefault) return;
+
     const confirmed = window.confirm(
       `“${keyword.keyword}” anahtar kelimesini silmek istediğinize emin misiniz?`,
     );
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setDeletingKeywordId(keyword.id);
-
       const response = await authenticatedFetch(
         `${API_URL}/search-keywords/${keyword.id}`,
-        {
-          method: 'DELETE',
-        },
+        { method: 'DELETE' },
       );
-
+      const body = await response.json().catch(() => null);
       if (!response.ok) {
-        const responseBody =
-          await response
-            .json()
-            .catch(() => null);
-
-        throw new Error(
-          responseBody?.message ??
-            'Anahtar kelime silinemedi.',
-        );
+        throw new Error(body?.message ?? 'Anahtar kelime silinemedi.');
       }
-
-      if (
-        selectedKeyword ===
-        keyword.keyword
-      ) {
-        setResults([]);
-        setBusinessMatches({});
-        setSelectedMatches({});
-        setBusinessNameInputs({});
-        setLocationHintInputs({});
-        setCaptionInputs({});
-        setCaptionCandidates({});
-      }
-
       await loadKeywords();
-
-      setMessage({
-        text:
-          'Anahtar kelime silindi.',
-        severity: 'success',
-      });
+      setMessage({ text: 'Anahtar kelime silindi.', severity: 'success' });
     } catch (error) {
       setMessage({
-        text:
-          error instanceof Error
-            ? error.message
-            : 'Anahtar kelime silinemedi.',
+        text: error instanceof Error ? error.message : 'Anahtar kelime silinemedi.',
         severity: 'error',
       });
     } finally {
@@ -872,25 +855,19 @@ export default function SearchDiscoveryPage() {
       return;
     }
 
-    const siteQuery =
-      searchPlatform === 'INSTAGRAM'
-        ? 'site:instagram.com'
-        : searchPlatform === 'FACEBOOK'
-          ? 'site:facebook.com'
-          : searchPlatform === 'LINKEDIN'
-            ? '(site:linkedin.com/posts OR site:linkedin.com/feed/update)'
-            : searchPlatform === 'KARIYER_NET'
-              ? 'site:kariyer.net/is-ilani'
-              : searchPlatform === 'SAHIBINDEN'
-                ? 'site:sahibinden.com/restoran-konaklama'
-                : '(site:instagram.com OR site:facebook.com OR site:linkedin.com/posts OR site:linkedin.com/feed/update OR site:kariyer.net/is-ilani OR site:sahibinden.com/restoran-konaklama)';
+    const siteQuery = `(${searchPlatforms
+      .map((platform) => PLATFORM_SITE_QUERIES[platform])
+      .join(' OR ')})`;
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 30);
     const afterDate = cutoffDate.toISOString().slice(0, 10);
 
+    const keywordQuery = `(${selectedKeywords
+      .map((keyword) => `"${keyword.replace(/"/g, '')}"`)
+      .join(' OR ')})`;
     const query =
-      `${siteQuery} ${selectedKeyword} after:${afterDate}`;
+      `${siteQuery} ${keywordQuery} after:${afterDate}`;
 
     setResults([]);
     setBusinessMatches({});
@@ -1095,7 +1072,7 @@ export default function SearchDiscoveryPage() {
     candidate: CaptionCandidate,
   ) => {
     const socialUrl = getSocialResultUrl(result.url);
-    const platform = getSocialPlatform(socialUrl, searchPlatform);
+    const platform = getSocialPlatform(socialUrl, searchPlatforms);
 
     return saveCandidate(`${result.url}:${candidate.id}`, {
       name: candidate.businessName,
@@ -1103,6 +1080,7 @@ export default function SearchDiscoveryPage() {
       ...getSocialUrlPayload(platform, socialUrl),
       discoverySource: platform,
       notes: candidate.context || undefined,
+      postingDate: analyzeResultDate(result).date,
     });
   };
 
@@ -1284,8 +1262,8 @@ export default function SearchDiscoveryPage() {
         <Typography
           color="text.secondary"
         >
-          Google üzerinden Instagram ve Facebook
-          işletme profillerini bulun,
+          Google üzerinden seçtiğiniz sosyal medya ve ilan
+          sitelerindeki işletmeleri bulun,
           inceleyin ve aday olarak
           kaydedin.
         </Typography>
@@ -1317,26 +1295,35 @@ export default function SearchDiscoveryPage() {
             variant="subtitle2"
             color="text.secondary"
           >
-            Anahtar kelime
+            Aranacak siteler
           </Typography>
 
           <ToggleButtonGroup
-            exclusive
             size="small"
-            value={searchPlatform}
-            onChange={(_event, value: SearchPlatform | null) => {
-              if (value) {
-                setSearchPlatform(value);
+            value={searchPlatforms}
+            onChange={(_event, value: DiscoveryPlatform[]) => {
+              if (value.length > 0) {
+                setSearchPlatforms(value);
               }
             }}
+            sx={{ flexWrap: 'wrap' }}
           >
             <ToggleButton value="INSTAGRAM">Instagram</ToggleButton>
             <ToggleButton value="FACEBOOK">Facebook</ToggleButton>
             <ToggleButton value="LINKEDIN">LinkedIn</ToggleButton>
             <ToggleButton value="KARIYER_NET">Kariyer.net</ToggleButton>
             <ToggleButton value="SAHIBINDEN">Sahibinden</ToggleButton>
-            <ToggleButton value="ALL">Tümü</ToggleButton>
           </ToggleButtonGroup>
+
+          <Box>
+            <Button
+              size="small"
+              onClick={() => setSearchPlatforms(DISCOVERY_PLATFORMS)}
+              disabled={searchPlatforms.length === DISCOVERY_PLATFORMS.length}
+            >
+              Tümünü seç
+            </Button>
+          </Box>
 
           <Stack
             direction={{
@@ -1398,26 +1385,28 @@ export default function SearchDiscoveryPage() {
                     keyword.keyword
                   }
                   clickable
-                  disabled={
-                    deletingKeywordId ===
-                    keyword.id
-                  }
+                  disabled={deletingKeywordId === keyword.id}
                   color={
-                    selectedKeyword ===
-                    keyword.keyword
+                    selectedKeywords.includes(keyword.keyword)
                       ? 'primary'
                       : 'default'
                   }
                   onClick={() => {
-                    setSelectedKeyword(
-                      keyword.keyword,
-                    );
+                    setSelectedKeywords((current) => {
+                      if (current.includes(keyword.keyword)) {
+                        return current.length > 1
+                          ? current.filter((item) => item !== keyword.keyword)
+                          : current;
+                      }
+
+                      return [...current, keyword.keyword];
+                    });
                   }}
-                  onDelete={() => {
-                    void deleteKeyword(
-                      keyword,
-                    );
-                  }}
+                  onDelete={
+                    keyword.isDefault
+                      ? undefined
+                      : () => void deleteKeyword(keyword)
+                  }
                 />
               ))}
           </Stack>
@@ -1429,7 +1418,7 @@ export default function SearchDiscoveryPage() {
             }
             disabled={
               !searchReady ||
-              !selectedKeyword
+              selectedKeywords.length === 0
             }
             onClick={runSearch}
           >
@@ -1997,7 +1986,7 @@ export default function SearchDiscoveryPage() {
                         const socialUrl = getSocialResultUrl(result.url);
                         const platform = getSocialPlatform(
                           socialUrl,
-                          searchPlatform,
+                          searchPlatforms,
                         );
 
                         void saveCandidate(result.url, {
@@ -2014,6 +2003,7 @@ export default function SearchDiscoveryPage() {
                           googleMapsUrl: match?.googleMapsUrl,
                           ...getSocialUrlPayload(platform, socialUrl),
                           discoverySource: platform,
+                          postingDate: analyzeResultDate(result).date,
                         });
                       }}
                     >

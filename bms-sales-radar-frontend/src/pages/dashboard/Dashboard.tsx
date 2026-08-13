@@ -44,7 +44,7 @@ export default function Dashboard() {
           <Route
             index
             element={
-              <PermissionRoute permission="DASHBOARD_VIEW">
+              <PermissionRoute permission="BUSINESS_VIEW">
                 <BusinessGrid />
               </PermissionRoute>
             }

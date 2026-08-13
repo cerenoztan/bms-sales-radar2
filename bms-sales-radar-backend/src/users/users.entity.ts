@@ -25,6 +25,12 @@ export class User {
   @Column()
   passwordHash!: string;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  passwordResetTokenHash!: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  passwordResetExpiresAt!: Date | null;
+
   @ManyToOne(
     () => Role,
     (role) => role.users,

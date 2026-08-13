@@ -10,14 +10,19 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 import { DataGrid } from '@mui/x-data-grid';
 import type { GridColDef } from '@mui/x-data-grid';
 
 import CreateUserDialog from './CreateUserDialog';
-import { hasPermission } from '../../auth/authStorage';
+import {
+  authenticatedFetch,
+  getStoredUser,
+  hasPermission,
+} from '../../auth/authStorage';
 
-const API_URL = 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 interface Role {
   id: number;
@@ -153,6 +158,43 @@ export default function UsersPage() {
     });
   };
 
+  const handleDeleteUser = async (user: UserRow) => {
+    if (user.id === getStoredUser()?.id) {
+      setSnackbar({
+        open: true,
+        message: 'Kendi kullanıcı hesabınızı silemezsiniz.',
+        severity: 'error',
+      });
+      return;
+    }
+
+    if (!window.confirm(`“${user.fullName}” kullanıcısını silmek istiyor musunuz?`)) {
+      return;
+    }
+
+    try {
+      const response = await authenticatedFetch(`${API_URL}/users/${user.id}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(body?.message ?? 'Kullanıcı silinemedi.');
+      }
+      setRows((current) => current.filter((item) => item.id !== user.id));
+      setSnackbar({
+        open: true,
+        message: 'Kullanıcı silindi.',
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error instanceof Error ? error.message : 'Kullanıcı silinemedi.',
+        severity: 'error',
+      });
+    }
+  };
+
   const columns: GridColDef<UserRow>[] = [
     {
       field: 'fullName',
@@ -229,6 +271,27 @@ export default function UsersPage() {
           size="small"
           variant="outlined"
         />
+      ),
+    },
+    {
+      field: 'actions',
+      headerName: 'İşlemler',
+      minWidth: 120,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          color="error"
+          startIcon={<DeleteIcon />}
+          disabled={
+            !hasPermission('USER_DELETE') ||
+            params.row.id === getStoredUser()?.id
+          }
+          onClick={() => void handleDeleteUser(params.row)}
+        >
+          Sil
+        </Button>
       ),
     },
   ];

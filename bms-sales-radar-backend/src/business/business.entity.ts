@@ -50,6 +50,9 @@ export class Business {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  @Column({ type: 'datetime', nullable: true })
+  postingDate?: Date;
+
  @Column({nullable:true})
   address?: string;
 

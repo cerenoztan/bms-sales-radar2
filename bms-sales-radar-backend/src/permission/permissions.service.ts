@@ -143,6 +143,10 @@ export class PermissionsService
         name: 'Raporları görüntüleme',
         key: 'REPORT_VIEW',
       },
+      {
+        name: 'Sistem ayarlarını yönetme',
+        key: 'SETTINGS_MANAGE',
+      },
     ];
 
     for (const item of defaults) {

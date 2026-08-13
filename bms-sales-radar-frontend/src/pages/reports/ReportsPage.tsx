@@ -47,7 +47,21 @@ interface SavedCandidate {
   status: string;
   discoverySource?: string;
   notes?: string;
+  postingDate?: string;
   createdAt: string;
+}
+
+function formatDate(value?: string): string {
+  if (!value) return 'Belirlenemedi';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Belirlenemedi';
+
+  return new Intl.DateTimeFormat('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
 }
 
 const statusOptions = [
@@ -60,6 +74,20 @@ const statusOptions = [
   ['LOST', 'Kaybedildi'],
 ] as const;
 
+type StatusFilter = 'ALL' | (typeof statusOptions)[number][0];
+type PostingDateFilter = 'ALL' | 'LAST_DAY' | 'LAST_WEEK' | 'LAST_MONTH';
+
+const postingDateFilterOptions: Array<[PostingDateFilter, string, number?]> = [
+  ['ALL', 'Tüm ilan tarihleri'],
+  ['LAST_DAY', 'Son 1 gün', 1],
+  ['LAST_WEEK', 'Son 1 hafta', 7],
+  ['LAST_MONTH', 'Son 1 ay', 30],
+];
+
+function getStatusLabel(status: string): string {
+  return statusOptions.find(([value]) => value === status)?.[1] ?? status;
+}
+
 export default function ReportsPage() {
   const [downloading, setDownloading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -68,6 +96,50 @@ export default function ReportsPage() {
   const [editingCandidate, setEditingCandidate] =
     React.useState<SavedCandidate | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('ALL');
+  const [sourceFilter, setSourceFilter] = React.useState('ALL');
+  const [postingDateFilter, setPostingDateFilter] =
+    React.useState<PostingDateFilter>('ALL');
+
+  const sourceOptions = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          candidates
+            .map((candidate) => candidate.discoverySource?.trim())
+            .filter((source): source is string => Boolean(source)),
+        ),
+      ).sort((first, second) => first.localeCompare(second, 'tr')),
+    [candidates],
+  );
+
+  const filteredCandidates = React.useMemo(
+    () => {
+      const selectedDateOption = postingDateFilterOptions.find(
+        ([value]) => value === postingDateFilter,
+      );
+      const days = selectedDateOption?.[2];
+      const cutoffDate = days ? new Date(Date.now() - days * 24 * 60 * 60 * 1000) : null;
+
+      return candidates.filter((candidate) => {
+        const postingDate = candidate.postingDate
+          ? new Date(candidate.postingDate)
+          : null;
+        const matchesPostingDate =
+          !cutoffDate ||
+          (postingDate !== null &&
+            !Number.isNaN(postingDate.getTime()) &&
+            postingDate >= cutoffDate);
+
+        return (
+          (statusFilter === 'ALL' || candidate.status === statusFilter) &&
+          (sourceFilter === 'ALL' || candidate.discoverySource === sourceFilter) &&
+          matchesPostingDate
+        );
+      });
+    },
+    [candidates, postingDateFilter, sourceFilter, statusFilter],
+  );
 
   const loadCandidates = React.useCallback(async () => {
     try {
@@ -249,8 +321,69 @@ export default function ReportsPage() {
             Kaydedilen adaylar
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {loading ? 'Yükleniyor...' : `${candidates.length} aday`}
+            {loading
+              ? 'Yükleniyor...'
+              : statusFilter === 'ALL' &&
+                  sourceFilter === 'ALL' &&
+                  postingDateFilter === 'ALL'
+                ? `${candidates.length} aday`
+                : `${filteredCandidates.length} aday gösteriliyor · Toplam ${candidates.length}`}
           </Typography>
+
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.5}
+            sx={{ mt: 2 }}
+          >
+            <TextField
+              select
+              size="small"
+              label="Duruma göre listele"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="ALL">Tüm durumlar</MenuItem>
+              {statusOptions.map(([value, label]) => (
+                <MenuItem key={value} value={value}>
+                  {label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              size="small"
+              label="Kaynağa göre listele"
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="ALL">Tüm kaynaklar</MenuItem>
+              {sourceOptions.map((source) => (
+                <MenuItem key={source} value={source}>
+                  {source}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              size="small"
+              label="İlan tarihine göre listele"
+              value={postingDateFilter}
+              onChange={(event) =>
+                setPostingDateFilter(event.target.value as PostingDateFilter)
+              }
+              sx={{ minWidth: 220 }}
+            >
+              {postingDateFilterOptions.map(([value, label]) => (
+                <MenuItem key={value} value={value}>
+                  {label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
         </Box>
         <TableContainer>
           <Table size="small">
@@ -261,18 +394,22 @@ export default function ReportsPage() {
                 <TableCell>Telefon</TableCell>
                 <TableCell>Kaynak</TableCell>
                 <TableCell>Durum</TableCell>
+                <TableCell>İlan tarihi</TableCell>
+                <TableCell>Kaydetme tarihi</TableCell>
                 <TableCell>Not</TableCell>
                 <TableCell align="right">İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {candidates.map((candidate) => (
+              {filteredCandidates.map((candidate) => (
                 <TableRow key={candidate.id} hover>
                   <TableCell sx={{ fontWeight: 600 }}>{candidate.name}</TableCell>
                   <TableCell>{candidate.address ?? '-'}</TableCell>
                   <TableCell>{candidate.phone ?? '-'}</TableCell>
                   <TableCell>{candidate.discoverySource ?? '-'}</TableCell>
-                  <TableCell>{candidate.status}</TableCell>
+                  <TableCell>{getStatusLabel(candidate.status)}</TableCell>
+                  <TableCell>{formatDate(candidate.postingDate)}</TableCell>
+                  <TableCell>{formatDate(candidate.createdAt)}</TableCell>
                   <TableCell sx={{ maxWidth: 260 }}>{candidate.notes || '-'}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
@@ -295,6 +432,13 @@ export default function ReportsPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {!loading && filteredCandidates.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                    Bu durumda kayıtlı aday bulunamadı.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>

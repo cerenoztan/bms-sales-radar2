@@ -60,4 +60,11 @@ export class SearchKeywordController {
   ) {
     return this.keywordService.remove(id);
   }
+
+  @Delete(':id/default')
+  removeDefault(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.keywordService.removeDefault(id);
+  }
 }

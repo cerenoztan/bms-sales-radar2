@@ -25,7 +25,7 @@ const menuItems = [
     label: 'Ana Sayfa',
     path: '/dashboard',
     icon: <DashboardIcon />,
-    permission: 'DASHBOARD_VIEW',
+    permission: 'BUSINESS_VIEW',
   },
   {
   label: 'Aday Keşfi',

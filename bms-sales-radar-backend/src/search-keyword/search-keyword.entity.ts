@@ -23,6 +23,11 @@ export class SearchKeyword {
   })
   isActive!: boolean;
 
+  @Column({
+    default: false,
+  })
+  isDefault!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

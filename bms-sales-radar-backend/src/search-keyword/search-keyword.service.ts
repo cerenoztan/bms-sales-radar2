@@ -57,6 +57,7 @@ export class SearchKeywordService {
       this.keywordRepository.create({
         keyword: dto.keyword,
         isActive: true,
+        isDefault: dto.isDefault ?? false,
       });
 
     return this.keywordRepository.save(
@@ -116,6 +117,35 @@ export class SearchKeywordService {
     if (!keyword) {
       throw new NotFoundException(
         'Anahtar kelime bulunamadı.',
+      );
+    }
+
+    if (keyword.isDefault) {
+      throw new ConflictException(
+        'Varsayılan anahtar kelimeler Ayarlar ekranından yönetilmelidir.',
+      );
+    }
+
+    await this.keywordRepository.remove(
+      keyword,
+    );
+  }
+
+  async removeDefault(id: number): Promise<void> {
+    const keyword =
+      await this.keywordRepository.findOneBy({
+        id,
+      });
+
+    if (!keyword) {
+      throw new NotFoundException(
+        'Anahtar kelime bulunamadı.',
+      );
+    }
+
+    if (!keyword.isDefault) {
+      throw new ConflictException(
+        'Bu kelime varsayılan anahtar kelime listesinde değil.',
       );
     }
 

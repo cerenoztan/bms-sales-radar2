@@ -12,6 +12,7 @@ import { User} from './users.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Role } from '../roles/role.entity';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class UsersService {
@@ -263,6 +264,39 @@ if (isFirstUser) {
   );
 
   await this.userRepository.save(user);
+  }
+
+  async setPasswordResetToken(
+    id: number,
+    token: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const user = await this.findEntityById(id);
+    user.passwordResetTokenHash = createHash('sha256').update(token).digest('hex');
+    user.passwordResetExpiresAt = expiresAt;
+    await this.userRepository.save(user);
+  }
+
+  async resetPasswordWithToken(token: string, password: string): Promise<boolean> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const user = await this.userRepository.findOneBy({
+      passwordResetTokenHash: tokenHash,
+    });
+
+    if (
+      !user ||
+      !user.isActive ||
+      !user.passwordResetExpiresAt ||
+      user.passwordResetExpiresAt.getTime() <= Date.now()
+    ) {
+      return false;
+    }
+
+    user.passwordHash = await bcrypt.hash(password, 12);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    await this.userRepository.save(user);
+    return true;
   }
 
   async remove(id: number): Promise<void> {

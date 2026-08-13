@@ -12,12 +12,17 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'node:crypto';
+import { MailService } from './mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async getSetupStatus() {
@@ -135,79 +140,40 @@ export class AuthService {
     return response;
   }
 
-  const resetToken =
-    await this.jwtService.signAsync(
-      {
-        sub: user.id,
-        email: user.email,
-        purpose: 'password-reset',
-      },
-      {
-        expiresIn: '15m',
-      },
-    );
+  const resetToken = randomBytes(32).toString('hex');
+  await this.usersService.setPasswordResetToken(
+    user.id,
+    resetToken,
+    new Date(Date.now() + 15 * 60 * 1000),
+  );
 
+  const frontendUrl =
+    this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
   const resetUrl =
-    `http://localhost:5173/reset-password` +
+    `${frontendUrl.replace(/\/$/, '')}/reset-password` +
     `?token=${encodeURIComponent(resetToken)}`;
 
-  // Şimdilik e-posta yerine terminalde gösteriyoruz.
-  console.log('RESET PASSWORD URL:', resetUrl);
+  try {
+    await this.mailService.sendPasswordReset(user.email, resetUrl);
+  } catch (error) {
+    // Hesabın sistemde bulunup bulunmadığını API yanıtından belli etmeyiz.
+    console.error('Şifre sıfırlama e-postası gönderilemedi:', error);
+  }
 
-  return {
-    ...response,
-
-    // Sadece geliştirme aşamasında bırak.
-    resetUrl,
-  };
+  return response;
  }
  async resetPassword(
   dto: ResetPasswordDto,
 ) {
-  let payload: {
-    sub: number;
-    email: string;
-    purpose: string;
-  };
-
-  try {
-    payload =
-      await this.jwtService.verifyAsync<{
-        sub: number;
-        email: string;
-        purpose: string;
-      }>(dto.token);
-  } catch {
+  const updated = await this.usersService.resetPasswordWithToken(
+    dto.token,
+    dto.password,
+  );
+  if (!updated) {
     throw new BadRequestException(
       'Şifre yenileme bağlantısı geçersiz veya süresi dolmuş.',
     );
   }
-
-  if (payload.purpose !== 'password-reset') {
-    throw new BadRequestException(
-      'Geçersiz şifre yenileme bağlantısı.',
-    );
-  }
-
-  const user =
-    await this.usersService.findByEmail(
-      payload.email,
-    );
-
-  if (
-    !user ||
-    !user.isActive ||
-    user.id !== payload.sub
-  ) {
-    throw new BadRequestException(
-      'Şifre yenileme bağlantısı geçersiz.',
-    );
-  }
-
-  await this.usersService.updatePassword(
-    user.id,
-    dto.password,
-  );
 
   return {
   message: 'Şifreniz başarıyla güncellendi.',

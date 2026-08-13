@@ -1,5 +1,7 @@
 import {
+  IsBoolean,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
@@ -15,4 +17,8 @@ export class CreateSearchKeywordDto {
   @IsNotEmpty()
   @MaxLength(200)
   keyword!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
 }

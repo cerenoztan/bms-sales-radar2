@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsEnum,
   IsOptional,
   IsPhoneNumber,
@@ -48,6 +49,10 @@ export class UpdateBusinessDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsDateString()
+  postingDate?: string;
 
   @IsOptional()
   @IsPhoneNumber('TR')

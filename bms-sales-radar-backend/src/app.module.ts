@@ -22,6 +22,8 @@ import { SearchKeyword } from './search-keyword/search-keyword.entity';
 import { SearchKeywordModule } from './search-keyword/search-keyword.module';
 import { GoogleScanRunEntity } from './google/entities/google-scan-run.entity';
 import { AnalyzerModule } from './analyzer/analyzer.module';
+import { SettingsModule } from './settings/settings.module';
+import { SmtpSettings } from './settings/smtp-settings.entity';
 
 @Module({
   imports: [
@@ -32,7 +34,7 @@ import { AnalyzerModule } from './analyzer/analyzer.module';
       type: 'better-sqlite3',
       database: 'sales-radar.sqlite',
       entities: [Business,Source,User,GooglePlaceEntity,Role,Permission,
-      SearchKeyword,GoogleScanRunEntity,
+      SearchKeyword,GoogleScanRunEntity,SmtpSettings,
       ],
       synchronize: true,
     }),
@@ -48,6 +50,7 @@ import { AnalyzerModule } from './analyzer/analyzer.module';
     PermissionsModule,
     SearchKeywordModule,
     AnalyzerModule,
+    SettingsModule,
 
     
   ],

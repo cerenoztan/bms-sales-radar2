@@ -7,8 +7,12 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { User } from './users.entity';
+import { BadRequestException } from '@nestjs/common';
 
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -57,7 +61,13 @@ export class UsersController {
   @RequirePermissions('USER_DELETE')
   async remove(
     @Param('id', ParseIntPipe) id: number,
+    @Req() request: Request & { user: User },
   ) {
+    if (request.user.id === id) {
+      throw new BadRequestException(
+        'Kendi kullanıcı hesabınızı silemezsiniz.',
+      );
+    }
     await this.usersService.remove(id);
 
     return {
