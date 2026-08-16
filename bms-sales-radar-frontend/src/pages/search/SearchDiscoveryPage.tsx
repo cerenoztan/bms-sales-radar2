@@ -864,7 +864,7 @@ export default function SearchDiscoveryPage() {
     const afterDate = cutoffDate.toISOString().slice(0, 10);
 
     const keywordQuery = `(${selectedKeywords
-      .map((keyword) => `"${keyword.replace(/"/g, '')}"`)
+      .map((keyword) => keyword.replace(/"/g, '').trim())
       .join(' OR ')})`;
     const query =
       `${siteQuery} ${keywordQuery} after:${afterDate}`;
@@ -996,46 +996,6 @@ export default function SearchDiscoveryPage() {
     } finally {
       setAnalyzingUrl(null);
     }
-  };
-
-  const useCaptionCandidate = (
-    result: GoogleSearchResult,
-    candidate: CaptionCandidate,
-  ) => {
-    setBusinessNameInputs(
-      (currentInputs) => ({
-        ...currentInputs,
-        [result.url]:
-          candidate.businessName,
-      }),
-    );
-
-    setLocationHintInputs(
-      (currentInputs) => ({
-        ...currentInputs,
-        [result.url]:
-          candidate.locationHint ?? '',
-      }),
-    );
-
-    setBusinessMatches(
-      (currentMatches) => ({
-        ...currentMatches,
-        [result.url]: [],
-      }),
-    );
-
-    setSelectedMatches(
-      (currentMatches) => {
-        const nextMatches = {
-          ...currentMatches,
-        };
-
-        delete nextMatches[result.url];
-
-        return nextMatches;
-      },
-    );
   };
 
   const saveCandidate = async (
@@ -1713,19 +1673,6 @@ export default function SearchDiscoveryPage() {
 
                             <Box>
                               <Stack direction="row" spacing={1}>
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  onClick={() => {
-                                    useCaptionCandidate(
-                                      result,
-                                      candidate,
-                                    );
-                                  }}
-                                >
-                                  Bu adayı kullan
-                                </Button>
-
                                 <Button
                                   size="small"
                                   variant="contained"
